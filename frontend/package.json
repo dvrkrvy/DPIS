@@ -1,6 +1,7 @@
 {
   "name": "dpis-frontend",
   "version": "1.0.0",
+  "homepage": "https://dvrkrvy.github.io/DPIS",
   "description": "DPIS Frontend - Mental Health Support Platform",
   "private": true,
   "dependencies": {
@@ -16,14 +17,17 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.19",
+    "gh-pages": "^6.3.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.19"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+  "start": "react-scripts start",
+  "build": "react-scripts build",
+  "predeploy": "npm run build",
+  "deploy": "gh-pages -d build",
+  "test": "react-scripts test",
+  "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
