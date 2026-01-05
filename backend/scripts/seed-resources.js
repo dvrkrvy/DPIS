@@ -1,0 +1,137 @@
+const pool = require('../config/database');
+require('dotenv').config();
+
+const dummyResources = [
+  {
+    title: 'Understanding Anxiety - Educational Video',
+    description: 'A comprehensive video explaining anxiety, its symptoms, and healthy coping mechanisms.',
+    category: 'video',
+    content_type: 'anxiety',
+    url: 'https://www.youtube.com/embed/WWloIAQpMcQ',
+    tags: ['anxiety', 'education', 'video'],
+    is_active: true
+  },
+  {
+    title: 'Depression: What You Need to Know',
+    description: 'Learn about depression symptoms, causes, and evidence-based treatments.',
+    category: 'video',
+    content_type: 'depression',
+    url: 'https://www.youtube.com/embed/z-IR48Mb3W0',
+    tags: ['depression', 'education', 'video'],
+    is_active: true
+  },
+  {
+    title: '5-Minute Mindfulness Meditation',
+    description: 'A quick guided meditation to help reduce stress and improve focus.',
+    category: 'video',
+    content_type: 'general',
+    url: 'https://www.youtube.com/embed/inpok4MKVLM',
+    tags: ['meditation', 'mindfulness', 'relaxation', 'video'],
+    is_active: true
+  },
+  {
+    title: 'Deep Breathing Exercises for Stress Relief',
+    description: 'Learn breathing techniques that can help you manage stress and anxiety in the moment.',
+    category: 'video',
+    content_type: 'stress',
+    url: 'https://www.youtube.com/embed/tEmt1Znux58',
+    tags: ['breathing', 'stress', 'anxiety', 'video'],
+    is_active: true
+  },
+  {
+    title: 'Building Resilience and Mental Strength',
+    description: 'Strategies for developing resilience and mental toughness during challenging times.',
+    category: 'video',
+    content_type: 'general',
+    url: 'https://www.youtube.com/embed/2iDj4-nWX_c',
+    tags: ['resilience', 'mental-health', 'wellness', 'video'],
+    is_active: true
+  },
+  {
+    title: 'Sleep Hygiene: Tips for Better Sleep',
+    description: 'Practical advice for improving your sleep quality and establishing healthy sleep routines.',
+    category: 'article',
+    content_type: 'wellness',
+    url: 'https://www.sleepfoundation.org/sleep-hygiene',
+    tags: ['sleep', 'wellness', 'health', 'article'],
+    is_active: true
+  },
+  {
+    title: 'Coping with Academic Stress',
+    description: 'A guide to managing stress related to studies, exams, and academic pressure.',
+    category: 'guide',
+    content_type: 'stress',
+    url: null,
+    tags: ['stress', 'academic', 'coping', 'guide'],
+    is_active: true
+  },
+  {
+    title: 'Mindfulness-Based Stress Reduction',
+    description: 'Introduction to MBSR techniques and how they can help reduce stress and improve wellbeing.',
+    category: 'audio',
+    content_type: 'general',
+    url: 'https://www.youtube.com/embed/BXWvKDSwvls',
+    tags: ['mindfulness', 'stress-reduction', 'meditation', 'audio'],
+    is_active: true
+  },
+  {
+    title: 'Social Connection and Mental Health',
+    description: 'Understanding the importance of social connections for mental wellbeing.',
+    category: 'article',
+    content_type: 'general',
+    url: 'https://www.mentalhealth.org.uk/explore-mental-health/publications/social-relationships-and-mental-health',
+    tags: ['social', 'mental-health', 'wellness', 'article'],
+    is_active: true
+  },
+  {
+    title: 'Yoga for Anxiety Relief',
+    description: 'Gentle yoga routine specifically designed to help reduce anxiety and promote relaxation.',
+    category: 'video',
+    content_type: 'anxiety',
+    url: 'https://www.youtube.com/embed/4pLUleLdwY4',
+    tags: ['yoga', 'anxiety', 'exercise', 'video'],
+    is_active: true
+  },
+  {
+    title: 'Mindfulness-Based Stress Reduction',
+    description: 'Introduction to MBSR techniques and how they can help reduce stress and improve wellbeing.',
+    category: 'audio',
+    content_type: 'general',
+    url: 'https://www.youtube.com/embed/ZToicYcHIOU',
+    tags: ['mindfulness', 'stress-reduction', 'meditation', 'audio'],
+    is_active: true
+  }
+];
+
+const seedResources = async () => {
+  try {
+    // Clear existing dummy resources (optional - comment out if you want to keep existing)
+    // await pool.query('DELETE FROM resources WHERE url LIKE \'%youtube%\' OR category = \'video\'');
+
+    // Insert dummy resources
+    for (const resource of dummyResources) {
+      await pool.query(
+        `INSERT INTO resources (title, description, category, content_type, url, tags, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT DO NOTHING`,
+        [
+          resource.title,
+          resource.description,
+          resource.category,
+          resource.content_type,
+          resource.url,
+          resource.tags,
+          resource.is_active
+        ]
+      );
+    }
+
+    console.log(`✅ Created ${dummyResources.length} dummy resources`);
+    await pool.end();
+  } catch (error) {
+    console.error('Error seeding resources:', error);
+    process.exit(1);
+  }
+};
+
+seedResources();
