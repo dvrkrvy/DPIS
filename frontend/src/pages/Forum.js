@@ -20,7 +20,7 @@ const Forum = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io("https://dpis-backend.onrender.com", {
       auth: { token }
     });
     setSocket(newSocket);
