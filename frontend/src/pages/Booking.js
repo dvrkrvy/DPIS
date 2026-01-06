@@ -82,7 +82,7 @@ const Booking = () => {
     }
 
     try {
-      await axios.patch(`/api/booking/${bookingId}/cancel`, {}, {
+      await api.patch(`/api/booking/${bookingId}/cancel`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success('Booking cancelled');
