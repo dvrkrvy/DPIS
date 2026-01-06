@@ -1,12 +1,23 @@
 import axios from 'axios';
 import API_BASE_URL from '../config';
 
+// Ensure baseURL is set correctly
+const baseURL = API_BASE_URL || 'https://dpis-backend.onrender.com';
+
+console.log('Creating axios instance with baseURL:', baseURL);
+
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Verify baseURL is set
+if (!api.defaults.baseURL) {
+  console.error('WARNING: axios baseURL is not set!');
+  api.defaults.baseURL = baseURL;
+}
 
 // Add request interceptor to log requests
 api.interceptors.request.use(
