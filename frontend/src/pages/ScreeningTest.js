@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -21,12 +21,13 @@ const ScreeningTest = () => {
 
   const fetchTests = async () => {
     try {
-      const response = await axios.get('/api/screening/tests', {
+      const response = await api.get('/api/screening/tests', {
         headers: { Authorization: `Bearer ${token}` }
       });
       // Don't auto-select - let user choose
       // Tests are available, user will select manually
     } catch (error) {
+      console.error('Failed to fetch tests:', error);
       toast.error('Failed to fetch tests');
     }
   };
@@ -39,13 +40,14 @@ const ScreeningTest = () => {
 
   const loadTest = async () => {
     try {
-      const response = await axios.get(`/api/screening/tests/${testType}`, {
+      const response = await api.get(`/api/screening/tests/${testType}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTest(response.data);
       setResponses({});
       setCurrentQuestion(0);
     } catch (error) {
+      console.error('Failed to load test:', error);
       toast.error('Failed to load test');
     }
   };
@@ -88,7 +90,7 @@ const ScreeningTest = () => {
     setLoading(true);
     try {
       const responsesArray = test.questions.map(q => responses[q.id] !== undefined ? responses[q.id] : 0);
-      const response = await axios.post(
+      const response = await api.post(
         '/api/screening/submit',
         {
           testType,

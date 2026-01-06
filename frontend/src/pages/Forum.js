@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { io } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -52,11 +52,8 @@ const Forum = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/forum/categories`,
-        authHeader
-      );
-      setCategories(res.data.categories);
+      const res = await api.get('/api/forum/categories', authHeader);
+      setCategories(res.data.categories || []);
     } catch {
       setCategories([
         { value: 'general', label: 'General' },
@@ -72,12 +69,10 @@ const Forum = () => {
     setLoading(true);
     try {
       const q = selectedCategory ? `?category=${selectedCategory}` : '';
-      const res = await axios.get(
-        `${API_BASE_URL}/api/forum/posts${q}`,
-        authHeader
-      );
+      const res = await api.get(`/api/forum/posts${q}`, authHeader);
       setPosts(res.data.posts || []);
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch posts:', error);
       toast.error('Failed to fetch posts');
       setPosts([]);
     } finally {
@@ -87,12 +82,10 @@ const Forum = () => {
 
   const fetchPost = async (postId) => {
     try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/forum/posts/${postId}`,
-        authHeader
-      );
+      const res = await api.get(`/api/forum/posts/${postId}`, authHeader);
       setPost(res.data.post);
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch post:', error);
       toast.error('Failed to fetch post');
     }
   };
@@ -101,16 +94,13 @@ const Forum = () => {
   const handleCreatePost = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/forum/posts`,
-        newPost,
-        authHeader
-      );
+      await api.post('/api/forum/posts', newPost, authHeader);
       toast.success('Post created');
       setShowCreatePost(false);
       setNewPost({ title: '', content: '', category: 'general' });
       fetchPosts();
-    } catch {
+    } catch (error) {
+      console.error('Failed to create post:', error);
       toast.error('Failed to create post');
     }
   };
@@ -118,15 +108,12 @@ const Forum = () => {
   const handleAddReply = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/forum/posts/${id}/replies`,
-        { content: newReply },
-        authHeader
-      );
+      await api.post(`/api/forum/posts/${id}/replies`, { content: newReply }, authHeader);
       toast.success('Reply added');
       setNewReply('');
       fetchPost(id);
-    } catch {
+    } catch (error) {
+      console.error('Failed to add reply:', error);
       toast.error('Failed to add reply');
     }
   };

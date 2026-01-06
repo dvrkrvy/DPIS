@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../api/axios';
 import { useAuth } from '../../contexts/AuthContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import toast from 'react-hot-toast';
@@ -19,11 +19,12 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await axios.get('/api/admin/dashboard', {
+      const response = await api.get('/api/admin/dashboard', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDashboardData(response.data);
     } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
       toast.error('Failed to fetch dashboard data');
     } finally {
       setLoading(false);
@@ -32,18 +33,18 @@ const AdminDashboard = () => {
 
   const fetchEmergencyFlags = async () => {
     try {
-      const response = await axios.get('/api/admin/emergency-flags?resolved=false', {
+      const response = await api.get('/api/admin/emergency-flags?resolved=false', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setEmergencyFlags(response.data.flags);
+      setEmergencyFlags(response.data.flags || []);
     } catch (error) {
-      console.error('Failed to fetch emergency flags');
+      console.error('Failed to fetch emergency flags:', error);
     }
   };
 
   const handleResolveFlag = async (flagId) => {
     try {
-      await axios.patch(`/api/admin/emergency-flags/${flagId}/resolve`, {}, {
+      await api.patch(`/api/admin/emergency-flags/${flagId}/resolve`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       toast.success('Flag resolved');

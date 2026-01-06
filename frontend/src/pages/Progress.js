@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
@@ -18,11 +18,12 @@ const Progress = () => {
   const fetchProgress = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/progress', {
+      const response = await api.get('/api/progress', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProgressData(response.data);
     } catch (error) {
+      console.error('Failed to fetch progress data:', error);
       toast.error('Failed to fetch progress data');
     } finally {
       setLoading(false);
@@ -32,7 +33,7 @@ const Progress = () => {
   const handleMoodSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(
+      await api.post(
         '/api/progress/mood',
         { moodScore, notes },
         {
@@ -44,13 +45,14 @@ const Progress = () => {
       setNotes('');
       fetchProgress();
     } catch (error) {
+      console.error('Failed to record mood:', error);
       toast.error('Failed to record mood');
     }
   };
 
   const fetchMoodTrends = async () => {
     try {
-      const response = await axios.get('/api/progress/mood-trends?days=30', {
+      const response = await api.get('/api/progress/mood-trends?days=30', {
         headers: { Authorization: `Bearer ${token}` }
       });
       return response.data.trends.map(t => ({

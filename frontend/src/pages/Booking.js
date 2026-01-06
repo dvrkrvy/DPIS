@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -25,11 +25,12 @@ const Booking = () => {
   const fetchBookings = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/booking/my-bookings', {
+      const response = await api.get('/api/booking/my-bookings', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setBookings(response.data.bookings);
+      setBookings(response.data.bookings || []);
     } catch (error) {
+      console.error('Failed to fetch bookings:', error);
       toast.error('Failed to fetch bookings');
     } finally {
       setLoading(false);
@@ -38,11 +39,12 @@ const Booking = () => {
 
   const fetchSlots = async () => {
     try {
-      const response = await axios.get(`/api/booking/slots?date=${selectedDate}`, {
+      const response = await api.get(`/api/booking/slots?date=${selectedDate}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setAvailableSlots(response.data.slots);
+      setAvailableSlots(response.data.slots || []);
     } catch (error) {
+      console.error('Failed to fetch available slots:', error);
       toast.error('Failed to fetch available slots');
     }
   };
@@ -55,7 +57,7 @@ const Booking = () => {
     }
 
     try {
-      await axios.post(
+      await api.post(
         '/api/booking',
         {
           bookingDate: selectedSlot,

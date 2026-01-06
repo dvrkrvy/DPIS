@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import toast from 'react-hot-toast';
@@ -18,11 +18,12 @@ const Dashboard = () => {
 
   const fetchData = async () => {
     try {
-      const response = await axios.get('/api/screening/latest', {
+      const response = await api.get('/api/screening/latest', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setLatestScreenings(response.data.results);
+      setLatestScreenings(response.data.results || []);
     } catch (error) {
+      console.error('Failed to load dashboard data:', error);
       toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);

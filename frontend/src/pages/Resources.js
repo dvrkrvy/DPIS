@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -21,23 +21,23 @@ const Resources = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get('/api/resources/meta/categories', {
+      const response = await api.get('/api/resources/meta/categories', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setCategories(response.data.categories);
+      setCategories(response.data.categories || []);
     } catch (error) {
-      console.error('Failed to fetch categories');
+      console.error('Failed to fetch categories:', error);
     }
   };
 
   const fetchContentTypes = async () => {
     try {
-      const response = await axios.get('/api/resources/meta/content-types', {
+      const response = await api.get('/api/resources/meta/content-types', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setContentTypes(response.data.contentTypes);
+      setContentTypes(response.data.contentTypes || []);
     } catch (error) {
-      console.error('Failed to fetch content types');
+      console.error('Failed to fetch content types:', error);
     }
   };
 
@@ -49,7 +49,7 @@ const Resources = () => {
       if (filters.contentType) params.append('contentType', filters.contentType);
       if (filters.search) params.append('search', filters.search);
 
-      const response = await axios.get(`/api/resources?${params}`, {
+      const response = await api.get(`/api/resources?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setResources(response.data.resources || []);
