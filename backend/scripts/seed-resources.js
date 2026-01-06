@@ -1,5 +1,16 @@
-const pool = require('../config/database');
+const { Pool } = require('pg');
 require('dotenv').config();
+
+// Use Render database if DATABASE_URL is set
+let pool;
+if (process.env.DATABASE_URL) {
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+} else {
+  pool = require('../config/database');
+}
 
 const dummyResources = [
   {
