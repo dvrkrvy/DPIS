@@ -42,15 +42,29 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     if (error.code === '23505') { // Unique violation
       return res.status(409).json({ message: 'Anonymous ID already exists' });
     }
     if (error.code === '42P01') { // Table doesn't exist
-      return res.status(500).json({ message: 'Database not initialized. Please run database setup.' });
+      return res.status(500).json({ 
+        message: 'Database not initialized. Please run database setup.',
+        error: error.message 
+      });
+    }
+    if (error.code === 'ECONNREFUSED' || error.message.includes('connect')) {
+      return res.status(500).json({ 
+        message: 'Database connection failed. Please check DATABASE_URL configuration.',
+        error: error.message 
+      });
     }
     res.status(500).json({ 
       message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: error.message,
+      code: error.code
     });
   }
 });
