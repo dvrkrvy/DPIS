@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
-import toast from 'react-hot-toast';
 
 const EmergencyButton = () => {
   const { isAuthenticated, token } = useAuth();
