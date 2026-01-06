@@ -29,13 +29,14 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: function (origin, callback) {
-      const allowed = [
-        process.env.FRONTEND_URL,
-        'https://dvrkrvy.github.io',
-        'http://localhost:3000'
-      ].filter(Boolean);
+      if (!origin) return callback(null, true);
       
-      if (!origin || allowed.some(allowed => origin.startsWith(allowed))) {
+      const requestOrigin = origin.split('/').slice(0, 3).join('/');
+      
+      if (allowedOrigins.some(allowed => {
+        const allowedOrigin = allowed.split('/').slice(0, 3).join('/');
+        return requestOrigin === allowedOrigin;
+      })) {
         callback(null, true);
       } else if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
@@ -52,25 +53,49 @@ const io = socketIo(server, {
 app.use(helmet());
 
 // CORS configuration - allow GitHub Pages and localhost
+// Note: CORS origin is protocol + domain + port (no path)
+// So 'https://dvrkrvy.github.io' matches, not 'https://dvrkrvy.github.io/DPIS'
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
   'https://dvrkrvy.github.io',
   'http://localhost:3000'
-].filter(Boolean); // Remove undefined values
+];
+
+// If FRONTEND_URL is set, extract just the origin (protocol + domain + port)
+if (process.env.FRONTEND_URL) {
+  try {
+    const url = new URL(process.env.FRONTEND_URL);
+    const origin = `${url.protocol}//${url.host}`;
+    if (!allowedOrigins.includes(origin)) {
+      allowedOrigins.push(origin);
+    }
+  } catch (e) {
+    // If FRONTEND_URL is not a valid URL, just use it as-is
+    if (!allowedOrigins.includes(process.env.FRONTEND_URL)) {
+      allowedOrigins.push(process.env.FRONTEND_URL);
+    }
+  }
+}
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Check if origin is in allowed list
-    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+    // Extract origin from the request (protocol + domain + port, no path)
+    const requestOrigin = origin.split('/').slice(0, 3).join('/');
+    
+    // Check if origin matches any allowed origin
+    if (allowedOrigins.some(allowed => {
+      const allowedOrigin = allowed.split('/').slice(0, 3).join('/');
+      return requestOrigin === allowedOrigin;
+    })) {
       callback(null, true);
     } else {
       // For development, allow all origins
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
       } else {
+        console.warn(`CORS blocked origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     }
