@@ -46,6 +46,12 @@ router.get('/posts', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Get forum posts error:', error);
+    if (error.name === 'MongooseError' || error.message.includes('Mongo') || error.message.includes('buffering timed out')) {
+      return res.status(503).json({ 
+        message: 'Forum service temporarily unavailable. MongoDB connection required.',
+        error: 'MongoDB not connected'
+      });
+    }
     res.status(500).json({ message: 'Failed to fetch forum posts' });
   }
 });
