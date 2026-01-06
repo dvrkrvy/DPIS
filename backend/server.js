@@ -109,6 +109,21 @@ const PORT = process.env.PORT || 5000;
 
 // Start server (database connections are non-blocking)
 const startServer = () => {
+  // Validate critical environment variables
+  if (!process.env.JWT_SECRET) {
+    console.error('❌ ERROR: JWT_SECRET is not set in environment variables');
+    console.error('⚠️  Set JWT_SECRET in your .env file or Render environment variables');
+    console.error('⚠️  Example: JWT_SECRET=your-super-secret-key-here');
+    // Use a default for development, but warn
+    if (process.env.NODE_ENV !== 'production') {
+      process.env.JWT_SECRET = 'dev-secret-key-change-in-production';
+      console.warn('⚠️  Using default JWT_SECRET for development. CHANGE THIS IN PRODUCTION!');
+    } else {
+      console.error('❌ Cannot start server without JWT_SECRET in production');
+      process.exit(1);
+    }
+  }
+
   // Connect to MongoDB (non-blocking)
   connectMongo().catch(err => {
     // Already handled in connectMongo, but catch just in case
@@ -119,6 +134,9 @@ const startServer = () => {
     console.log(`📡 API available at http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`⚠️  Note: Some features require PostgreSQL and MongoDB`);
+    if (process.env.DATABASE_URL) {
+      console.log(`✅ Using DATABASE_URL for PostgreSQL connection`);
+    }
   });
 };
 

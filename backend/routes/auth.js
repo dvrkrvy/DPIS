@@ -9,6 +9,11 @@ const router = express.Router();
 // Generate anonymous user account
 router.post('/register', async (req, res) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
     const anonymousId = `anon_${uuidv4().replace(/-/g, '')}`;
     
     const result = await pool.query(
@@ -37,13 +42,27 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Registration failed' });
+    if (error.code === '23505') { // Unique violation
+      return res.status(409).json({ message: 'Anonymous ID already exists' });
+    }
+    if (error.code === '42P01') { // Table doesn't exist
+      return res.status(500).json({ message: 'Database not initialized. Please run database setup.' });
+    }
+    res.status(500).json({ 
+      message: 'Registration failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 // Login (for returning anonymous users)
 router.post('/login', async (req, res) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
     const { anonymousId } = req.body;
 
     if (!anonymousId) {
@@ -66,7 +85,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, anonymousId: user.anonymous_id, role: user.role },
+      { userId: user.id, anonymousId: user.anonymous_id, role: user.role || 'student' },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -83,7 +102,13 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Login failed' });
+    if (error.code === '42P01') { // Table doesn't exist
+      return res.status(500).json({ message: 'Database not initialized. Please run database setup.' });
+    }
+    res.status(500).json({ 
+      message: 'Login failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
@@ -146,6 +171,10 @@ router.post('/admin/login', [
 // Verify token
 router.get('/verify', async (req, res) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ valid: false, message: 'Server configuration error' });
+    }
+
     const token = req.headers.authorization?.split(' ')[1];
     
     if (!token) {
@@ -168,7 +197,11 @@ router.get('/verify', async (req, res) => {
       return res.json({ valid: true, role: 'student', user: result.rows[0] });
     }
   } catch (error) {
-    res.status(401).json({ valid: false });
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(401).json({ valid: false });
+    }
+    console.error('Token verification error:', error);
+    res.status(500).json({ valid: false });
   }
 });
 

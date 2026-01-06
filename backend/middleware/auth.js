@@ -3,6 +3,11 @@ const pool = require('../config/database');
 
 const authenticate = async (req, res, next) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET is not set in environment variables');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
     const token = req.headers.authorization?.split(' ')[1];
     
     if (!token) {
@@ -11,7 +16,29 @@ const authenticate = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Verify user still exists and is active
+    // Handle admin authentication
+    if (decoded.role === 'admin') {
+      const result = await pool.query(
+        'SELECT id, email, name, institution, is_active FROM admins WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (result.rows.length === 0 || !result.rows[0].is_active) {
+        return res.status(401).json({ message: 'Admin not found or inactive' });
+      }
+
+      req.user = {
+        id: result.rows[0].id,
+        email: result.rows[0].email,
+        name: result.rows[0].name,
+        institution: result.rows[0].institution,
+        role: 'admin'
+      };
+
+      return next();
+    }
+
+    // Handle student/user authentication
     const result = await pool.query(
       'SELECT id, anonymous_id, role, is_active FROM users WHERE id = $1',
       [decoded.userId]
@@ -24,7 +51,7 @@ const authenticate = async (req, res, next) => {
     req.user = {
       id: result.rows[0].id,
       anonymousId: result.rows[0].anonymous_id,
-      role: result.rows[0].role
+      role: result.rows[0].role || 'student'
     };
 
     next();
@@ -35,6 +62,7 @@ const authenticate = async (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token expired' });
     }
+    console.error('Authentication error:', error);
     res.status(500).json({ message: 'Authentication error' });
   }
 };

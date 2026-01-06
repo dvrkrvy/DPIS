@@ -48,21 +48,38 @@ export const AuthProvider = ({ children }) => {
       const res = await api.post('/api/auth/register');
       const { token: newToken, user } = res.data;
 
+      if (!newToken || !user) {
+        toast.error('Invalid response from server');
+        return { success: false };
+      }
+
       setToken(newToken);
       setUser(user);
       localStorage.setItem('token', newToken);
 
       return { success: true };
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed');
+      const errorMessage = err.response?.data?.message || err.message || 'Registration failed';
+      console.error('Registration error:', err);
+      toast.error(errorMessage);
       return { success: false };
     }
   };
 
   const login = async (anonymousId) => {
     try {
-      const res = await api.post('/api/auth/login', { anonymousId });
+      if (!anonymousId || anonymousId.trim() === '') {
+        toast.error('Please enter your anonymous ID');
+        return { success: false };
+      }
+
+      const res = await api.post('/api/auth/login', { anonymousId: anonymousId.trim() });
       const { token: newToken, user } = res.data;
+
+      if (!newToken || !user) {
+        toast.error('Invalid response from server');
+        return { success: false };
+      }
 
       setToken(newToken);
       setUser(user);
@@ -70,7 +87,16 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true };
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      const errorMessage = err.response?.data?.message || err.message || 'Login failed';
+      console.error('Login error:', err);
+      
+      if (err.response?.status === 404) {
+        toast.error('Anonymous ID not found. Please create a new account.');
+      } else if (err.response?.status === 403) {
+        toast.error('Account is inactive. Please contact support.');
+      } else {
+        toast.error(errorMessage);
+      }
       return { success: false };
     }
   };
