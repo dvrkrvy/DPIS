@@ -45,10 +45,14 @@ export const AuthProvider = ({ children }) => {
 
   const register = async () => {
     try {
+      console.log('Attempting registration...');
       const res = await api.post('/api/auth/register');
+      console.log('Registration response:', res.data);
+      
       const { token: newToken, user } = res.data;
 
       if (!newToken || !user) {
+        console.error('Invalid response:', res.data);
         toast.error('Invalid response from server');
         return { success: false };
       }
@@ -56,12 +60,30 @@ export const AuthProvider = ({ children }) => {
       setToken(newToken);
       setUser(user);
       localStorage.setItem('token', newToken);
+      console.log('Registration successful, token saved');
 
       return { success: true };
     } catch (err) {
+      console.error('Registration error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: {
+          url: err.config?.url,
+          baseURL: err.config?.baseURL
+        }
+      });
+      
       const errorMessage = err.response?.data?.message || err.message || 'Registration failed';
-      console.error('Registration error:', err);
-      toast.error(errorMessage);
+      
+      if (err.response?.status === 0 || err.message?.includes('Network Error') || err.message?.includes('CORS')) {
+        toast.error('Cannot connect to server. Check your internet connection.');
+      } else if (err.response?.status === 500) {
+        toast.error(`Server error: ${errorMessage}`);
+      } else {
+        toast.error(errorMessage);
+      }
+      
       return { success: false };
     }
   };
