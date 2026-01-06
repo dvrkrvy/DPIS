@@ -78,7 +78,13 @@ async function initializeDatabase() {
   } catch (error) {
     console.error('❌ Database initialization failed:', error.message);
     console.error('Error details:', error);
-    process.exit(1);
+    // Only exit if run directly, not when imported
+    if (require.main === module) {
+      process.exit(1);
+    } else {
+      // Re-throw so caller can handle it
+      throw error;
+    }
   } finally {
     await pool.end();
   }
@@ -86,7 +92,10 @@ async function initializeDatabase() {
 
 // If run directly via `node scripts/init-database.js`
 if (require.main === module) {
-  initializeDatabase();
+  initializeDatabase().catch(err => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
 }
 
 // Export for programmatic use (e.g. from server.js)

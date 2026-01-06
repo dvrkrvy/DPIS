@@ -137,10 +137,10 @@ const startServer = async () => {
       console.log('✅ PostgreSQL schema initialization completed');
     } catch (err) {
       console.error('❌ Failed to auto-initialize PostgreSQL schema:', err.message);
-      if (process.env.NODE_ENV === 'production') {
-        // In production, fail fast if DB cannot be initialized
-        process.exit(1);
-      }
+      console.error('⚠️  Server will start, but database features may not work');
+      console.error('💡 To initialize database manually, run: node init-render-db.js');
+      // Don't crash the server - let it start and handle DB errors gracefully
+      // User can initialize DB manually using the script
     }
   }
 
