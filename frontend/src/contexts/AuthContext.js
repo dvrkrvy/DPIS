@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
@@ -27,60 +27,66 @@ export const AuthProvider = ({ children }) => {
 
   const verifyToken = async () => {
     try {
-      const response = await axios.get('/api/auth/verify', {
+      const res = await api.get('/api/auth/verify', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (response.data.valid) {
-        setUser(response.data.user);
+
+      if (res.data.valid) {
+        setUser(res.data.user);
       } else {
         logout();
       }
-    } catch (error) {
+    } catch {
       logout();
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async (anonymousId) => {
+  const register = async () => {
     try {
-      const response = await axios.post('/api/auth/login', { anonymousId });
-      const { token: newToken, user } = response.data;
+      const res = await api.post('/api/auth/register');
+      const { token: newToken, user } = res.data;
+
       setToken(newToken);
       setUser(user);
       localStorage.setItem('token', newToken);
+
       return { success: true };
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Registration failed');
       return { success: false };
     }
   };
 
-  const register = async () => {
+  const login = async (anonymousId) => {
     try {
-      const response = await axios.post('/api/auth/register');
-      const { token: newToken, user } = response.data;
+      const res = await api.post('/api/auth/login', { anonymousId });
+      const { token: newToken, user } = res.data;
+
       setToken(newToken);
       setUser(user);
       localStorage.setItem('token', newToken);
+
       return { success: true };
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Registration failed');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Login failed');
       return { success: false };
     }
   };
 
   const adminLogin = async (email, password) => {
     try {
-      const response = await axios.post('/api/auth/admin/login', { email, password });
-      const { token: newToken, admin } = response.data;
+      const res = await api.post('/api/auth/admin/login', { email, password });
+      const { token: newToken, admin } = res.data;
+
       setToken(newToken);
       setUser({ ...admin, role: 'admin' });
       localStorage.setItem('token', newToken);
+
       return { success: true };
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Admin login failed');
       return { success: false };
     }
   };
@@ -91,17 +97,21 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
   };
 
-  const value = {
-    user,
-    token,
-    loading,
-    login,
-    register,
-    adminLogin,
-    logout,
-    isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin'
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        register,
+        login,
+        adminLogin,
+        logout,
+        isAuthenticated: !!user,
+        isAdmin: user?.role === 'admin'
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
