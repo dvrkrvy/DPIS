@@ -1,10 +1,11 @@
 -- Ensure required extensions
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Create users table (anonymous)
+-- Create users table (anonymous with username)
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     anonymous_id VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(100) UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
     role VARCHAR(50) DEFAULT 'student',
@@ -85,6 +86,7 @@ CREATE TABLE IF NOT EXISTS admins (
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_users_anonymous_id ON users(anonymous_id);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_screening_user_id ON screening_results(user_id);
 CREATE INDEX IF NOT EXISTS idx_screening_created_at ON screening_results(created_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);

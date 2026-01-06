@@ -43,10 +43,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async () => {
+  const register = async (username) => {
     try {
-      console.log('Attempting registration...');
-      const res = await api.post('/api/auth/register');
+      if (!username || username.trim().length < 3) {
+        toast.error('Username must be at least 3 characters');
+        return { success: false };
+      }
+
+      console.log('Attempting registration with username:', username);
+      const res = await api.post('/api/auth/register', { username: username.trim() });
       console.log('Registration response:', res.data);
       
       const { token: newToken, user } = res.data;
@@ -88,14 +93,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (anonymousId) => {
+  const login = async (username) => {
     try {
-      if (!anonymousId || anonymousId.trim() === '') {
-        toast.error('Please enter your anonymous ID');
+      if (!username || username.trim() === '') {
+        toast.error('Please enter your username');
         return { success: false };
       }
 
-      const res = await api.post('/api/auth/login', { anonymousId: anonymousId.trim() });
+      const res = await api.post('/api/auth/login', { username: username.trim() });
       const { token: newToken, user } = res.data;
 
       if (!newToken || !user) {
@@ -113,7 +118,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Login error:', err);
       
       if (err.response?.status === 404) {
-        toast.error('Anonymous ID not found. Please create a new account.');
+        toast.error('Username not found. Please check your username or create a new account.');
       } else if (err.response?.status === 403) {
         toast.error('Account is inactive. Please contact support.');
       } else {

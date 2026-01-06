@@ -6,7 +6,7 @@ const { body, validationResult } = require('express-validator');
 const pool = require('../config/database');
 const router = express.Router();
 
-// Generate anonymous user account
+// Generate anonymous user account with username
 router.post('/register', async (req, res) => {
   try {
     if (!process.env.JWT_SECRET) {
@@ -14,17 +14,32 @@ router.post('/register', async (req, res) => {
       return res.status(500).json({ message: 'Server configuration error' });
     }
 
+    const { username } = req.body;
+    
+    if (!username || username.trim().length < 3) {
+      return res.status(400).json({ message: 'Username is required and must be at least 3 characters' });
+    }
+
+    const trimmedUsername = username.trim();
+    
+    // Validate username format (alphanumeric, underscore, hyphen, 3-20 chars)
+    if (!/^[a-zA-Z0-9_-]{3,20}$/.test(trimmedUsername)) {
+      return res.status(400).json({ 
+        message: 'Username must be 3-20 characters and contain only letters, numbers, underscores, or hyphens' 
+      });
+    }
+
     const anonymousId = `anon_${uuidv4().replace(/-/g, '')}`;
     
     const result = await pool.query(
-      'INSERT INTO users (anonymous_id, role) VALUES ($1, $2) RETURNING id, anonymous_id, created_at',
-      [anonymousId, 'student']
+      'INSERT INTO users (anonymous_id, username, role) VALUES ($1, $2, $3) RETURNING id, anonymous_id, username, created_at',
+      [anonymousId, trimmedUsername, 'student']
     );
 
     const user = result.rows[0];
     
     const token = jwt.sign(
-      { userId: user.id, anonymousId: user.anonymous_id, role: 'student' },
+      { userId: user.id, anonymousId: user.anonymous_id, username: user.username, role: 'student' },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -33,11 +48,12 @@ router.post('/register', async (req, res) => {
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
     res.status(201).json({
-      message: 'Anonymous account created',
+      message: 'Account created successfully',
       token,
       user: {
         id: user.id,
-        anonymousId: user.anonymous_id
+        anonymousId: user.anonymous_id,
+        username: user.username
       }
     });
   } catch (error) {
@@ -47,7 +63,10 @@ router.post('/register', async (req, res) => {
     console.error('Error stack:', error.stack);
     
     if (error.code === '23505') { // Unique violation
-      return res.status(409).json({ message: 'Anonymous ID already exists' });
+      if (error.constraint && error.constraint.includes('username')) {
+        return res.status(409).json({ message: 'Username already taken. Please choose another username.' });
+      }
+      return res.status(409).json({ message: 'Account already exists' });
     }
     if (error.code === '42P01') { // Table doesn't exist
       return res.status(500).json({ 
@@ -69,7 +88,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login (for returning anonymous users)
+// Login (using username)
 router.post('/login', async (req, res) => {
   try {
     if (!process.env.JWT_SECRET) {
@@ -77,19 +96,19 @@ router.post('/login', async (req, res) => {
       return res.status(500).json({ message: 'Server configuration error' });
     }
 
-    const { anonymousId } = req.body;
+    const { username } = req.body;
 
-    if (!anonymousId) {
-      return res.status(400).json({ message: 'Anonymous ID required' });
+    if (!username || username.trim().length === 0) {
+      return res.status(400).json({ message: 'Username is required' });
     }
 
     const result = await pool.query(
-      'SELECT id, anonymous_id, role, is_active FROM users WHERE anonymous_id = $1',
-      [anonymousId]
+      'SELECT id, anonymous_id, username, role, is_active FROM users WHERE username = $1',
+      [username.trim()]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Anonymous ID not found' });
+      return res.status(404).json({ message: 'Username not found. Please check your username or create a new account.' });
     }
 
     const user = result.rows[0];
@@ -99,7 +118,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, anonymousId: user.anonymous_id, role: user.role || 'student' },
+      { userId: user.id, anonymousId: user.anonymous_id, username: user.username, role: user.role || 'student' },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -111,7 +130,8 @@ router.post('/login', async (req, res) => {
       token,
       user: {
         id: user.id,
-        anonymousId: user.anonymous_id
+        anonymousId: user.anonymous_id,
+        username: user.username
       }
     });
   } catch (error) {
@@ -204,7 +224,7 @@ router.get('/verify', async (req, res) => {
       }
       return res.json({ valid: true, role: 'admin', user: result.rows[0] });
     } else {
-      const result = await pool.query('SELECT id, anonymous_id FROM users WHERE id = $1', [decoded.userId]);
+      const result = await pool.query('SELECT id, anonymous_id, username FROM users WHERE id = $1', [decoded.userId]);
       if (result.rows.length === 0) {
         return res.status(401).json({ valid: false });
       }

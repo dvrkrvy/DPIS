@@ -43,7 +43,12 @@ async function initializeDatabase() {
     console.log('✅ Database connection successful!\n');
 
     // Read init.sql
-    const initSqlPath = path.join(__dirname, 'backend', 'config', 'init.sql');
+    // Script can be run from root or backend directory
+    let initSqlPath = path.join(__dirname, 'backend', 'config', 'init.sql');
+    if (!fs.existsSync(initSqlPath)) {
+      // Try if running from backend directory
+      initSqlPath = path.join(__dirname, 'config', 'init.sql');
+    }
     if (!fs.existsSync(initSqlPath)) {
       throw new Error(`Cannot find init.sql at ${initSqlPath}`);
     }
