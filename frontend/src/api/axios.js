@@ -1,10 +1,10 @@
 import axios from 'axios';
 import API_BASE_URL from '../config';
 
-// Ensure baseURL is set correctly
-const baseURL = API_BASE_URL || 'https://dpis-backend.onrender.com';
+// Ensure baseURL is set correctly - remove trailing slash if present
+const baseURL = (API_BASE_URL || 'https://dpis-backend.onrender.com').replace(/\/$/, '');
 
-console.log('Creating axios instance with baseURL:', baseURL);
+console.log('🔧 Creating axios instance with baseURL:', baseURL);
 
 const api = axios.create({
   baseURL: baseURL,
@@ -15,9 +15,29 @@ const api = axios.create({
 
 // Verify baseURL is set
 if (!api.defaults.baseURL) {
-  console.error('WARNING: axios baseURL is not set!');
+  console.error('❌ WARNING: axios baseURL is not set!');
   api.defaults.baseURL = baseURL;
+} else {
+  console.log('✅ Axios baseURL verified:', api.defaults.baseURL);
 }
+
+// Override request to ensure baseURL is always used
+const originalRequest = api.request;
+api.request = function(config) {
+  // Ensure baseURL is always set
+  if (!config.baseURL && api.defaults.baseURL) {
+    config.baseURL = api.defaults.baseURL;
+  }
+  // If URL starts with http, don't modify it
+  // Otherwise, ensure it's relative and will use baseURL
+  if (config.url && !config.url.startsWith('http')) {
+    // Remove leading slash to ensure it's relative
+    if (config.url.startsWith('/')) {
+      config.url = config.url.substring(1);
+    }
+  }
+  return originalRequest.call(this, config);
+};
 
 // Add request interceptor to log requests
 api.interceptors.request.use(
