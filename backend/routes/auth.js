@@ -228,7 +228,17 @@ router.get('/verify', async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(401).json({ valid: false });
       }
-      return res.json({ valid: true, role: 'student', user: result.rows[0] });
+      const dbUser = result.rows[0];
+      // Return camelCase for consistency with registration/login endpoints
+      return res.json({ 
+        valid: true, 
+        role: 'student', 
+        user: {
+          id: dbUser.id,
+          anonymousId: dbUser.anonymous_id,
+          username: dbUser.username
+        }
+      });
     }
   } catch (error) {
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {

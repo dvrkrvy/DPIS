@@ -80,11 +80,11 @@ const Navbar = () => {
             {/* Profile Section */}
             <div className="flex items-center space-x-3 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700/50">
               <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                {user?.anonymous_id ? user.anonymous_id.charAt(0).toUpperCase() : 'U'}
+                {(user?.username || user?.anonymousId) ? (user?.username || user?.anonymousId).charAt(0).toUpperCase() : 'U'}
               </div>
               <div className="hidden md:block">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                  {user?.anonymous_id ? `ID: ${user.anonymous_id.substring(0, 8)}...` : 'User'}
+                  {user?.username || (user?.anonymousId ? `ID: ${user.anonymousId.substring(0, 8)}...` : 'User')}
                 </p>
               </div>
             </div>
