@@ -21,23 +21,8 @@ if (!api.defaults.baseURL) {
   console.log('✅ Axios baseURL verified:', api.defaults.baseURL);
 }
 
-// Override request to ensure baseURL is always used
-const originalRequest = api.request;
-api.request = function(config) {
-  // Ensure baseURL is always set
-  if (!config.baseURL && api.defaults.baseURL) {
-    config.baseURL = api.defaults.baseURL;
-  }
-  // If URL starts with http, don't modify it
-  // Otherwise, ensure it's relative and will use baseURL
-  if (config.url && !config.url.startsWith('http')) {
-    // Remove leading slash to ensure it's relative
-    if (config.url.startsWith('/')) {
-      config.url = config.url.substring(1);
-    }
-  }
-  return originalRequest.call(this, config);
-};
+// Ensure URLs starting with /api/ use the baseURL correctly
+// Axios should handle this automatically, but we'll verify in the interceptor
 
 // Add request interceptor to log requests
 api.interceptors.request.use(
