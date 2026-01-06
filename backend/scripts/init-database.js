@@ -84,4 +84,10 @@ async function initializeDatabase() {
   }
 }
 
-initializeDatabase();
+// If run directly via `node scripts/init-database.js`
+if (require.main === module) {
+  initializeDatabase();
+}
+
+// Export for programmatic use (e.g. from server.js)
+module.exports = initializeDatabase;

@@ -6,8 +6,10 @@ const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 
+// Database pool (PostgreSQL) and MongoDB connector
 const connectDB = require('./config/database');
 const connectMongo = require('./config/mongodb');
+const initializeDatabase = require('./scripts/init-database');
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -108,7 +110,7 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5000;
 
 // Start server (database connections are non-blocking)
-const startServer = () => {
+const startServer = async () => {
   // Validate critical environment variables
   if (!process.env.JWT_SECRET) {
     console.error('❌ ERROR: JWT_SECRET is not set in environment variables');
@@ -124,8 +126,32 @@ const startServer = () => {
     }
   }
 
+  // Optionally auto-initialize PostgreSQL schema (for environments without shell access)
+  const shouldAutoInitDb =
+    process.env.AUTO_INIT_DB === 'true' || process.env.AUTO_INIT_DB === '1';
+
+  if (shouldAutoInitDb) {
+    try {
+      console.log('🛠  AUTO_INIT_DB enabled – initializing PostgreSQL schema...');
+      await initializeDatabase();
+      console.log('✅ PostgreSQL schema initialization completed');
+    } catch (err) {
+      console.error('❌ Failed to auto-initialize PostgreSQL schema:', err.message);
+      if (process.env.NODE_ENV === 'production') {
+        // In production, fail fast if DB cannot be initialized
+        process.exit(1);
+      }
+    }
+  }
+
+  // Touch the PostgreSQL pool so its connection test runs
+  // (connectDB is the Pool instance; it logs connection status on import)
+  if (connectDB) {
+    console.log('ℹ️ PostgreSQL pool loaded');
+  }
+
   // Connect to MongoDB (non-blocking)
-  connectMongo().catch(err => {
+  connectMongo().catch(() => {
     // Already handled in connectMongo, but catch just in case
   });
   
@@ -136,6 +162,9 @@ const startServer = () => {
     console.log(`⚠️  Note: Some features require PostgreSQL and MongoDB`);
     if (process.env.DATABASE_URL) {
       console.log(`✅ Using DATABASE_URL for PostgreSQL connection`);
+    }
+    if (shouldAutoInitDb) {
+      console.log('🛠  AUTO_INIT_DB was enabled for this boot');
     }
   });
 };
