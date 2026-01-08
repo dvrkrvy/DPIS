@@ -26,7 +26,8 @@ function AIChatButton() {
   const navigate = useNavigate();
 
   // Hide on public auth pages (onboarding/login)
-  if (location.pathname === '/onboarding' || location.pathname === '/admin/login' || location.pathname === '/') {
+  const pathname = location.pathname;
+  if (pathname === '/onboarding' || pathname === '/admin/login' || pathname === '/' || pathname === '') {
     return null;
   }
 
