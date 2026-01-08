@@ -11,7 +11,39 @@ let gemini = null;
 let openai = null;
 let geminiModelName = null; // Store the working model name
 
-// Initialize Gemini if API key is available
+// Function to list available Gemini models
+async function listAvailableGeminiModels(apiKey) {
+  try {
+    const https = require('https');
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    
+    return new Promise((resolve, reject) => {
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data);
+            if (response.models) {
+              const availableModels = response.models
+                .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+                .map(m => m.name.replace('models/', ''));
+              resolve(availableModels);
+            } else {
+              resolve([]);
+            }
+          } catch (parseError) {
+            reject(parseError);
+          }
+        });
+      }).on('error', reject);
+    });
+  } catch (error) {
+    throw error;
+  }
+}
+
+// Initialize Gemini if API key is available (async initialization)
 console.log('🔍 Checking for GEMINI_API_KEY...', process.env.GEMINI_API_KEY ? 'Found' : 'Not found');
 if (process.env.GEMINI_API_KEY) {
   try {
@@ -19,11 +51,21 @@ if (process.env.GEMINI_API_KEY) {
     gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
     
-    // Test different model names to find which one works by actually testing the API
-    // We'll find the working model during the first API call since getGenerativeModel doesn't test the API
-    const modelNames = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-pro'];
-    console.log('📋 Will test models in order:', modelNames.join(', '));
-    geminiModelName = modelNames[0]; // Default to first one, will be updated on first successful call
+    // List available models from the API
+    listAvailableGeminiModels(process.env.GEMINI_API_KEY)
+      .then((models) => {
+        if (models && models.length > 0) {
+          console.log('📋 Available Gemini models:', models.join(', '));
+          geminiModelName = models[0]; // Use first available model
+          console.log(`✅ Will use model: ${geminiModelName}`);
+        } else {
+          console.warn('⚠️ No models found in API response. Will try defaults during first call.');
+        }
+      })
+      .catch((listError) => {
+        console.warn('⚠️ Could not list available models:', listError.message);
+        console.warn('⚠️ Will try default models during first API call');
+      });
   } catch (error) {
     console.error('❌ Gemini initialization error:', error.message);
     console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
@@ -125,6 +167,20 @@ These services are available 24/7 and are here to help.`,
       if (gemini) {
         try {
           console.log('🤖 Attempting to use Gemini API...');
+          
+          // If we don't have a working model yet, try to list available models now
+          if (!geminiModelName) {
+            try {
+              const availableModels = await listAvailableGeminiModels(process.env.GEMINI_API_KEY);
+              if (availableModels && availableModels.length > 0) {
+                geminiModelName = availableModels[0];
+                console.log(`✅ Found available model from API: ${geminiModelName}`);
+              }
+            } catch (listError) {
+              console.warn('⚠️ Could not list models:', listError.message);
+            }
+          }
+          
           // Try multiple model names in order of preference until one works
           const modelNames = geminiModelName 
             ? [geminiModelName, 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-pro']
