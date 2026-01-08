@@ -1500,6 +1500,9 @@ const personalizedResources = [
   },
 ];
 
+// Export for use in API endpoints
+module.exports = { personalizedResources };
+
 const seedPersonalizedResources = async () => {
   try {
     console.log('🌱 Seeding personalized resources...');
