@@ -17,6 +17,14 @@ if (process.env.GEMINI_API_KEY) {
     const { GoogleGenerativeAI } = require('@google/generative-ai');
     gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
+    
+    // Try to list available models to verify API connection
+    try {
+      const testModel = gemini.getGenerativeModel({ model: 'gemini-pro' });
+      console.log('✅ Verified: gemini-pro model is available');
+    } catch (testError) {
+      console.warn('⚠️ Could not verify gemini-pro model:', testError.message);
+    }
   } catch (error) {
     console.error('❌ Gemini initialization error:', error.message);
     console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
@@ -118,16 +126,9 @@ These services are available 24/7 and are here to help.`,
       if (gemini) {
         try {
           console.log('🤖 Attempting to use Gemini API...');
-          // Try gemini-1.0-pro first (most stable), fallback to gemini-pro
-          let model;
-          try {
-            model = gemini.getGenerativeModel({ model: 'gemini-1.0-pro' });
-            console.log('✅ Gemini model loaded: gemini-1.0-pro');
-          } catch (modelError) {
-            console.warn('⚠️ gemini-1.0-pro not available, trying gemini-pro...');
-            model = gemini.getGenerativeModel({ model: 'gemini-pro' });
-            console.log('✅ Gemini model loaded: gemini-pro');
-          }
+          // Use gemini-pro (the stable model name)
+          const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
+          console.log('✅ Gemini model loaded: gemini-pro');
           
           // Build conversation history for Gemini
           const chatHistory = [];
