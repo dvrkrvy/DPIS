@@ -33,14 +33,9 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Multi-key Gemini AI provider system with Gemma model rotation
 let geminiClients = []; // Array of { client, key, isActive, lastError, currentModelIndex }
-let gemmaModels = [
-  'gemma-3-12b',
-  'gemma-3-1b', 
-  'gemma-3-27b',
-  'gemma-3-2b',
-  'gemma-3-4b'
-]; // 5 Gemma models with 14.4K RPD each = 72K requests/day per API key
+let gemmaModels = []; // Will be populated dynamically from available models
 let currentKeyIndex = 0; // Round-robin index
+let modelsInitialized = false;
 
 // Function to list available Gemini models
 async function listAvailableGeminiModels(apiKey) {
@@ -77,6 +72,57 @@ async function listAvailableGeminiModels(apiKey) {
     });
   } catch (error) {
     throw error;
+  }
+}
+
+// Discover available Gemma models dynamically
+async function discoverAvailableGemmaModels() {
+  if (geminiClients.length === 0) {
+    console.warn('⚠️ No clients available to discover models');
+    return;
+  }
+  
+  try {
+    console.log('🔍 Discovering available Gemma models...');
+    const availableModels = await listAvailableGeminiModels(geminiClients[0].fullKey);
+    
+    // Filter for Gemma models (case-insensitive)
+    const gemmaModelList = availableModels.filter(m => 
+      m.toLowerCase().includes('gemma') && 
+      !m.toLowerCase().includes('embedding') // Exclude embedding models
+    );
+    
+    if (gemmaModelList.length > 0) {
+      gemmaModels = gemmaModelList;
+      console.log(`✅ Found ${gemmaModels.length} Gemma models: ${gemmaModels.join(', ')}`);
+      console.log(`✅ Total capacity per API key: ${gemmaModels.length * 14400} requests/day`);
+    } else {
+      // Fallback to Gemini Flash models if no Gemma models found
+      console.warn('⚠️ No Gemma models found. Falling back to Gemini Flash models.');
+      gemmaModels = availableModels.filter(m => 
+        m.toLowerCase().includes('flash') && 
+        !m.toLowerCase().includes('2.5') && // Avoid 2.5 models
+        !m.toLowerCase().includes('tts') &&
+        !m.toLowerCase().includes('native-audio')
+      );
+      
+      if (gemmaModels.length === 0) {
+        // Last resort: use any available model
+        gemmaModels = availableModels.slice(0, 5); // Take first 5 available
+        console.warn(`⚠️ Using first 5 available models: ${gemmaModels.join(', ')}`);
+      } else {
+        console.log(`✅ Using Gemini Flash models: ${gemmaModels.join(', ')}`);
+      }
+    }
+    
+    modelsInitialized = true;
+    console.log(`✅ Multi-key system ready with ${geminiClients.length} active key(s) and ${gemmaModels.length} model(s)`);
+  } catch (error) {
+    console.error('❌ Failed to discover models:', error.message);
+    // Fallback to default Gemini Flash
+    gemmaModels = ['gemini-1.5-flash'];
+    modelsInitialized = true;
+    console.warn('⚠️ Using fallback model: gemini-1.5-flash');
   }
 }
 
@@ -125,15 +171,14 @@ function initializeGeminiKeys() {
     return;
   }
   
-    // Initialize each client with Gemma model rotation
-    geminiClients.forEach(client => {
-      client.currentModelIndex = 0; // Start with first Gemma model
-      client.modelFailures = {}; // Track failures per model
-    });
-    
-    console.log(`✅ Using Gemma models with 14.4K RPD each: ${gemmaModels.join(', ')}`);
-    console.log(`✅ Total capacity per API key: ${gemmaModels.length * 14400} requests/day`);
-    console.log(`✅ Multi-key system ready with ${geminiClients.length} active key(s)`);
+  // Initialize each client with model rotation
+  geminiClients.forEach(client => {
+    client.currentModelIndex = 0; // Start with first model
+    client.modelFailures = {}; // Track failures per model
+  });
+  
+  // Dynamically discover available Gemma models
+  discoverAvailableGemmaModels();
 }
 
 // Initialize Gemini keys
@@ -170,8 +215,14 @@ function getNextGeminiClient() {
   return client;
 }
 
-// Get next available Gemma model for a client
+// Get next available model for a client (Gemma or fallback)
 function getNextGemmaModel(client) {
+  // Wait for models to be initialized
+  if (!modelsInitialized || gemmaModels.length === 0) {
+    // Fallback to default if not initialized
+    return 'gemini-1.5-flash';
+  }
+  
   // Try models in rotation, skipping ones that have failed recently
   const maxAttempts = gemmaModels.length;
   
