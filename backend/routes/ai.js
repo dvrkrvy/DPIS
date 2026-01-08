@@ -185,19 +185,19 @@ function getNextGeminiClient() {
 function markClientFailed(client, error) {
   const errorMessage = error.message || '';
   
-  // For quota/rate limit errors, disable for 5 minutes
+  // For quota/rate limit errors, disable for shorter time (2 minutes instead of 5)
   if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
     client.isActive = false;
     client.lastError = errorMessage;
     client.errorCount++;
-    console.warn(`⚠️ Key ${client.index + 1} (${client.key}) hit quota/rate limit. Disabling for 5 minutes.`);
+    console.warn(`⚠️ Key ${client.index + 1} (${client.key}) hit quota/rate limit. Disabling for 2 minutes.`);
     
-    // Re-enable after 5 minutes
+    // Re-enable after 2 minutes (reduced from 5)
     setTimeout(() => {
       client.isActive = true;
       client.errorCount = 0;
       console.log(`✅ Key ${client.index + 1} (${client.key}) re-enabled after cooldown.`);
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 2 * 60 * 1000); // 2 minutes (reduced from 5)
   } else {
     // For other errors, just increment count
     client.errorCount++;
@@ -205,12 +205,12 @@ function markClientFailed(client, error) {
       client.isActive = false;
       console.warn(`⚠️ Key ${client.index + 1} (${client.key}) disabled after ${client.errorCount} errors.`);
       
-      // Re-enable after 1 minute for non-quota errors
+      // Re-enable after 30 seconds for non-quota errors (reduced from 1 minute)
       setTimeout(() => {
         client.isActive = true;
         client.errorCount = 0;
         console.log(`✅ Key ${client.index + 1} (${client.key}) re-enabled after cooldown.`);
-      }, 60 * 1000); // 1 minute
+      }, 30 * 1000); // 30 seconds (reduced from 1 minute)
     }
   }
 }
@@ -230,32 +230,21 @@ const detectRiskKeywords = (text) => {
   return RISK_KEYWORDS.some(keyword => lowerText.includes(keyword));
 };
 
-// Retry function with exponential backoff and rate limit handling
-async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 1000) {
+// Retry function with fast failure for quota errors
+async function retryWithBackoff(fn, maxRetries = 2, initialDelay = 500) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error) {
       if (attempt === maxRetries - 1) throw error;
       
-      // Check if it's a rate limit error (429)
+      // Check if it's a rate limit error (429) or quota error
       const errorMessage = error.message || '';
       if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
-        // Extract retry-after time if available, otherwise use exponential backoff
-        const retryAfterMatch = errorMessage.match(/retry in ([\d.]+)s/i);
-        if (retryAfterMatch) {
-          const retryAfterSeconds = parseFloat(retryAfterMatch[1]);
-          const delay = Math.ceil(retryAfterSeconds * 1000) + 1000; // Add 1 second buffer
-          console.log(`⚠️ Rate limit hit. Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms (${retryAfterSeconds}s)`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          // Use longer delay for quota errors
-          const delay = initialDelay * Math.pow(3, attempt); // More aggressive backoff for quota
-          console.log(`⚠️ Quota/rate limit error. Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+        // For quota errors, don't wait - fail fast and try next key
+        throw error; // Don't retry, let the system try next key immediately
       } else {
-        // Regular exponential backoff for other errors
+        // Quick retry for other errors (network issues, etc.)
         const delay = initialDelay * Math.pow(2, attempt);
         console.log(`⚠️ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -264,8 +253,8 @@ async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 1000) {
   }
 }
 
-// Call Gemini API with timeout and retry
-async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs = 25000) {
+// Call Gemini API with shorter timeout and fast failure
+async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs = 15000) {
   return Promise.race([
     retryWithBackoff(async () => {
       const chat = chatHistory.length > 0 
@@ -280,7 +269,7 @@ async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs =
       });
       
       return result.response.text();
-    }, 2), // 2 retries
+    }, 1), // Only 1 retry for non-quota errors
     new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Gemini API timeout')), timeoutMs)
     )
@@ -386,9 +375,10 @@ These services are available 24/7 and are here to help.`,
 
     let aiResponse;
     let lastError = null;
+    let quotaErrors = 0; // Track how many keys hit quota
 
-    // Try each available Gemini client until one works
-    const maxAttempts = geminiClients.length;
+    // Try each available Gemini client until one works (max 3 attempts for speed)
+    const maxAttempts = Math.min(geminiClients.length, 3); // Try max 3 keys before giving up
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const geminiClient = getNextGeminiClient();
       
@@ -463,18 +453,34 @@ These services are available 24/7 and are here to help.`,
         console.error(`❌ Gemini API error with key ${geminiClient.index + 1}:`, geminiError.message);
         lastError = geminiError;
         
-        // Mark this client as failed
-        markClientFailed(geminiClient, geminiError);
+        const errorMessage = geminiError.message || '';
         
-        // Try next key if available
+        // Check if it's a quota error
+        if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+          quotaErrors++;
+          markClientFailed(geminiClient, geminiError);
+          
+          // If all keys hit quota, fail fast
+          if (quotaErrors >= maxAttempts) {
+            console.error('❌ All attempted keys hit quota. Failing fast.');
+            break;
+          }
+        } else {
+          // For non-quota errors, mark as failed but continue
+          markClientFailed(geminiClient, geminiError);
+        }
+        
+        // Try next key if available (but don't wait long)
         if (attempt < maxAttempts - 1) {
           console.log(`⚠️ Trying next available key...`);
+          // Small delay to avoid hammering keys
+          await new Promise(resolve => setTimeout(resolve, 100));
           continue;
         }
       }
     }
     
-    // All keys failed, return error message
+    // All keys failed, return error message quickly
     if (lastError) {
       const errorMessage = lastError.message || 'Unknown error';
       let userMessage = 'I\'m experiencing some technical difficulties with the AI service. ';
