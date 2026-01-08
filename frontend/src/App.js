@@ -36,6 +36,7 @@ function AIChatButton() {
     <button
       onClick={() => navigate('/ai-chat')}
       className="fixed bottom-20 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-50 flex items-center gap-2"
+      style={{ minWidth: '140px' }}
       title="AI Support Chat"
     >
       <span>🤖</span>
