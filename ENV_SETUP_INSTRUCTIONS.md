@@ -5,10 +5,15 @@
 ### Backend (.env file)
 
 1. **Location**: Create or edit `backend/.env` file
-2. **Add this line**:
+2. **Add this line** (replace with your own API key):
    ```
-   GEMINI_API_KEY=AIzaSyAbaBpQGI2X5bMnT2R3psfYZjCFGAF2GVA
+   GEMINI_API_KEY=your-gemini-api-key-here
    ```
+   
+   **To get a Gemini API key:**
+   - Go to https://aistudio.google.com/apikey
+   - Sign in and click "Create API Key"
+   - Copy the key and paste it above
 
 3. **Restart your backend server**:
    ```bash
@@ -36,11 +41,16 @@ No environment variables needed for local development (uses default localhost:50
 1. **Go to Render Dashboard**: https://dashboard.render.com
 2. **Select your backend service** (e.g., `dpis-backend`)
 3. **Go to "Environment" tab**
-4. **Add/Edit these variables**:
+4. **Add/Edit these variables** (replace with your own API key):
 
    ```
-   GEMINI_API_KEY=AIzaSyAbaBpQGI2X5bMnT2R3psfYZjCFGAF2GVA
+   GEMINI_API_KEY=your-gemini-api-key-here
    ```
+   
+   **To get a Gemini API key:**
+   - Go to https://aistudio.google.com/apikey
+   - Sign in and click "Create API Key"
+   - Copy the key and paste it in Render
 
 5. **Click "Save Changes"**
 6. **Render will automatically redeploy** (takes 1-2 minutes)
