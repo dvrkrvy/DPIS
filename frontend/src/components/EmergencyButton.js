@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
-import AIChatButton from './AIChatButton';
 
 const EmergencyButton = () => {
   const { isAuthenticated, token } = useAuth();
+  const navigate = useNavigate();
   const [showContacts, setShowContacts] = useState(false);
   const [contacts, setContacts] = useState(null);
 
@@ -29,9 +30,17 @@ const EmergencyButton = () => {
 
   return (
     <>
-      {/* AI Chat Button - always render, positioned above emergency button */}
-      <AIChatButton />
-      
+      {/* AI Chat Button - positioned above emergency button */}
+      <button
+        onClick={() => navigate('/ai-chat')}
+        className="fixed bottom-32 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl z-50 flex items-center gap-2 transition-all duration-200 hover:scale-105"
+        title="AI Support Chat"
+        style={{ bottom: '112px' }}
+      >
+        <span className="text-xl">🤖</span>
+        <span>AI Chat</span>
+      </button>
+
       {/* Emergency button only shows when authenticated */}
       {isAuthenticated && (
         <>

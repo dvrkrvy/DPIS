@@ -6,7 +6,6 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import Navbar from './components/Navbar';
 import EmergencyButton from './components/EmergencyButton';
-import AIChatButton from './components/AIChatButton';
 
 // Student Pages
 import Onboarding from './pages/Onboarding';
