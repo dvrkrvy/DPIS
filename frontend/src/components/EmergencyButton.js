@@ -33,9 +33,15 @@ const EmergencyButton = () => {
       {/* AI Chat Button - positioned above emergency button */}
       <button
         onClick={() => navigate('/ai-chat')}
-        className="fixed bottom-32 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl z-50 flex items-center gap-2 transition-all duration-200 hover:scale-105"
+        className="fixed right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl flex items-center gap-2 transition-all duration-200 hover:scale-105"
         title="AI Support Chat"
-        style={{ bottom: '112px' }}
+        style={{ 
+          bottom: '112px',
+          zIndex: 60,
+          position: 'fixed',
+          display: 'block',
+          visibility: 'visible'
+        }}
       >
         <span className="text-xl">🤖</span>
         <span>AI Chat</span>
