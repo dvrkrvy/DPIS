@@ -31,9 +31,10 @@ let activeRequests = 0;
 const responseCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Initialize Gemini AI provider
-let gemini = null;
+// Multi-key Gemini AI provider system
+let geminiClients = []; // Array of { client, key, isActive, lastError }
 let geminiModelName = null;
+let currentKeyIndex = 0; // Round-robin index
 
 // Function to list available Gemini models
 async function listAvailableGeminiModels(apiKey) {
@@ -73,20 +74,57 @@ async function listAvailableGeminiModels(apiKey) {
   }
 }
 
-// Initialize Gemini if API key is available
-console.log('🔍 Checking for GEMINI_API_KEY...', process.env.GEMINI_API_KEY ? 'Found' : 'Not found');
-if (process.env.GEMINI_API_KEY) {
-  try {
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-    gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
-    
-    // Prefer flash model for speed (use 1.5-flash, not 2.5-flash)
-    geminiModelName = 'gemini-1.5-flash';
-    console.log(`✅ Will use model: ${geminiModelName} (optimized for speed)`);
-    
-    // Verify model availability in background
-    listAvailableGeminiModels(process.env.GEMINI_API_KEY)
+// Initialize multiple Gemini API keys
+function initializeGeminiKeys() {
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+  
+  // Get all API keys from environment (GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3)
+  const keys = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3
+  ].filter(key => key && key.trim() !== ''); // Remove empty keys
+  
+  if (keys.length === 0) {
+    console.warn('⚠️ No GEMINI_API_KEY found in environment variables');
+    console.warn('⚠️ Set GEMINI_API_KEY, GEMINI_API_KEY_2, and GEMINI_API_KEY_3 for multi-key support');
+    return;
+  }
+  
+  console.log(`🔍 Found ${keys.length} Gemini API key(s)`);
+  
+  // Initialize clients for each key
+  keys.forEach((key, index) => {
+    try {
+      const client = new GoogleGenerativeAI(key);
+      geminiClients.push({
+        client: client,
+        key: key.substring(0, 10) + '...', // Store masked key for logging
+        fullKey: key,
+        isActive: true,
+        lastError: null,
+        errorCount: 0,
+        index: index
+      });
+      console.log(`✅ Gemini client ${index + 1} initialized with key: ${key.substring(0, 10)}...`);
+    } catch (error) {
+      console.error(`❌ Failed to initialize Gemini client ${index + 1}:`, error.message);
+    }
+  });
+  
+  if (geminiClients.length === 0) {
+    console.error('❌ No Gemini clients initialized');
+    return;
+  }
+  
+  // Prefer flash model for speed (use 1.5-flash, not 2.5-flash)
+  geminiModelName = 'gemini-1.5-flash';
+  console.log(`✅ Will use model: ${geminiModelName} (optimized for speed)`);
+  console.log(`✅ Multi-key system ready with ${geminiClients.length} active key(s)`);
+  
+  // Verify model availability in background (use first key)
+  if (geminiClients.length > 0) {
+    listAvailableGeminiModels(geminiClients[0].fullKey)
       .then((models) => {
         if (models && models.length > 0) {
           console.log('📋 Available Gemini models:', models.join(', '));
@@ -106,12 +144,73 @@ if (process.env.GEMINI_API_KEY) {
         console.warn('⚠️ Could not list available models:', listError.message);
         console.warn('⚠️ Will use default model: gemini-1.5-flash');
       });
-  } catch (error) {
-    console.error('❌ Gemini initialization error:', error.message);
-    console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
   }
-} else {
-  console.warn('⚠️ GEMINI_API_KEY not found in environment variables');
+}
+
+// Initialize Gemini keys
+try {
+  initializeGeminiKeys();
+} catch (error) {
+  console.error('❌ Gemini initialization error:', error.message);
+  console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
+}
+
+// Get next available Gemini client (round-robin with fallback)
+function getNextGeminiClient() {
+  if (geminiClients.length === 0) return null;
+  
+  // Find active clients
+  const activeClients = geminiClients.filter(c => c.isActive);
+  
+  if (activeClients.length === 0) {
+    // All keys failed, reset all and try again
+    console.warn('⚠️ All API keys failed, resetting all keys');
+    geminiClients.forEach(c => {
+      c.isActive = true;
+      c.errorCount = 0;
+    });
+    return geminiClients[0];
+  }
+  
+  // Round-robin selection
+  const client = activeClients[currentKeyIndex % activeClients.length];
+  currentKeyIndex = (currentKeyIndex + 1) % activeClients.length;
+  
+  return client;
+}
+
+// Mark a client as failed (temporarily disable for quota/rate limit errors)
+function markClientFailed(client, error) {
+  const errorMessage = error.message || '';
+  
+  // For quota/rate limit errors, disable for 5 minutes
+  if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+    client.isActive = false;
+    client.lastError = errorMessage;
+    client.errorCount++;
+    console.warn(`⚠️ Key ${client.index + 1} (${client.key}) hit quota/rate limit. Disabling for 5 minutes.`);
+    
+    // Re-enable after 5 minutes
+    setTimeout(() => {
+      client.isActive = true;
+      client.errorCount = 0;
+      console.log(`✅ Key ${client.index + 1} (${client.key}) re-enabled after cooldown.`);
+    }, 5 * 60 * 1000); // 5 minutes
+  } else {
+    // For other errors, just increment count
+    client.errorCount++;
+    if (client.errorCount >= 3) {
+      client.isActive = false;
+      console.warn(`⚠️ Key ${client.index + 1} (${client.key}) disabled after ${client.errorCount} errors.`);
+      
+      // Re-enable after 1 minute for non-quota errors
+      setTimeout(() => {
+        client.isActive = true;
+        client.errorCount = 0;
+        console.log(`✅ Key ${client.index + 1} (${client.key}) re-enabled after cooldown.`);
+      }, 60 * 1000); // 1 minute
+    }
+  }
 }
 
 // OpenAI removed - using Gemini only
@@ -258,8 +357,8 @@ These services are available 24/7 and are here to help.`,
       });
     }
 
-    // If Gemini is not available, return a helpful message
-    if (!gemini) {
+    // If no Gemini clients are available, return a helpful message
+    if (geminiClients.length === 0) {
       return res.json({
         message: 'I\'m here to listen and support you. While I\'m not a replacement for professional help, I can help you explore your feelings. Would you like to access our resource hub or speak with a counselor?',
         isEmergency: false
@@ -284,17 +383,29 @@ These services are available 24/7 and are here to help.`,
     });
 
     let aiResponse;
+    let lastError = null;
 
-    // Use Gemini only
-    try {
-      // Ensure we use 1.5-flash, not 2.5-flash (which may not exist or have different limits)
-      let modelToUse = geminiModelName || 'gemini-1.5-flash';
-      // Force 1.5-flash if somehow 2.5 got set
-      if (modelToUse.includes('2.5')) {
-        console.warn('⚠️ Detected 2.5 model, switching to 1.5-flash');
-        modelToUse = 'gemini-1.5-flash';
+    // Try each available Gemini client until one works
+    const maxAttempts = geminiClients.length;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const geminiClient = getNextGeminiClient();
+      
+      if (!geminiClient) {
+        console.error('❌ No available Gemini clients');
+        break;
       }
-      const model = gemini.getGenerativeModel({ model: modelToUse });
+      
+      try {
+        // Ensure we use 1.5-flash, not 2.5-flash (which may not exist or have different limits)
+        let modelToUse = geminiModelName || 'gemini-1.5-flash';
+        // Force 1.5-flash if somehow 2.5 got set
+        if (modelToUse.includes('2.5')) {
+          console.warn('⚠️ Detected 2.5 model, switching to 1.5-flash');
+          modelToUse = 'gemini-1.5-flash';
+        }
+        
+        console.log(`🤖 Using Gemini key ${geminiClient.index + 1} (${geminiClient.key})`);
+        const model = geminiClient.client.getGenerativeModel({ model: modelToUse });
       
       // Build conversation history (limit to last 4 messages for speed)
       const chatHistory = [];
@@ -317,39 +428,53 @@ These services are available 24/7 and are here to help.`,
         contextPrompt += `The user recently completed a ${latest.test_type} screening with a ${latest.severity} severity score (${latest.score}). `;
       }
       
-      const messageWithContext = contextPrompt + '\n\nUser: ' + message;
-      
-      console.log('📤 Sending message to Gemini...');
-      const startTime = Date.now();
-      
-      aiResponse = await callGeminiAPI(model, messageWithContext, chatHistory);
-      
-      const responseTime = Date.now() - startTime;
-      console.log(`✅ Received response from Gemini in ${responseTime}ms`);
-      
-      // Cache response
-      if (!detectRiskKeywords(message)) {
-        responseCache.set(cacheKey, {
-          response: aiResponse,
-          timestamp: Date.now()
+        const messageWithContext = contextPrompt + '\n\nUser: ' + message;
+        
+        console.log('📤 Sending message to Gemini...');
+        const startTime = Date.now();
+        
+        aiResponse = await callGeminiAPI(model, messageWithContext, chatHistory);
+        
+        const responseTime = Date.now() - startTime;
+        console.log(`✅ Received response from Gemini key ${geminiClient.index + 1} in ${responseTime}ms`);
+        
+        // Cache response
+        if (!detectRiskKeywords(message)) {
+          responseCache.set(cacheKey, {
+            response: aiResponse,
+            timestamp: Date.now()
+          });
+          // Clean old cache entries (keep cache under 100 entries)
+          if (responseCache.size > 100) {
+            const oldestKey = responseCache.keys().next().value;
+            responseCache.delete(oldestKey);
+          }
+        }
+        
+        // Success! Return response
+        return res.json({
+          message: aiResponse,
+          isEmergency: false
         });
-        // Clean old cache entries (keep cache under 100 entries)
-        if (responseCache.size > 100) {
-          const oldestKey = responseCache.keys().next().value;
-          responseCache.delete(oldestKey);
+        
+      } catch (geminiError) {
+        console.error(`❌ Gemini API error with key ${geminiClient.index + 1}:`, geminiError.message);
+        lastError = geminiError;
+        
+        // Mark this client as failed
+        markClientFailed(geminiClient, geminiError);
+        
+        // Try next key if available
+        if (attempt < maxAttempts - 1) {
+          console.log(`⚠️ Trying next available key...`);
+          continue;
         }
       }
-      
-      res.json({
-        message: aiResponse,
-        isEmergency: false
-      });
-    } catch (geminiError) {
-      console.error('❌ Gemini API error:', geminiError.message);
-      console.error('❌ Error details:', geminiError);
-      
-      // Provide helpful error message with retry suggestion
-      const errorMessage = geminiError.message || 'Unknown error';
+    }
+    
+    // All keys failed, return error message
+    if (lastError) {
+      const errorMessage = lastError.message || 'Unknown error';
       let userMessage = 'I\'m experiencing some technical difficulties with the AI service. ';
       
       // Check for specific error types
@@ -360,9 +485,9 @@ These services are available 24/7 and are here to help.`,
         const retryAfterMatch = errorMessage.match(/retry in ([\d.]+)s/i);
         if (retryAfterMatch) {
           const retrySeconds = Math.ceil(parseFloat(retryAfterMatch[1]));
-          userMessage += `The service has reached its usage limit. Please wait about ${retrySeconds} seconds and try again.`;
+          userMessage += `All API keys have reached their usage limits. Please wait about ${retrySeconds} seconds and try again.`;
         } else {
-          userMessage += 'The service has reached its usage limit for now. Please wait a few minutes and try again.';
+          userMessage += 'All API keys have reached their usage limits for now. Please wait a few minutes and try again.';
         }
       } else if (errorMessage.includes('403') || errorMessage.includes('401')) {
         userMessage += 'There\'s an authentication issue. Please contact support.';
@@ -375,6 +500,12 @@ These services are available 24/7 and are here to help.`,
         isEmergency: false
       });
     }
+    
+    // Fallback if no error but no response
+    return res.json({
+      message: 'I\'m experiencing some technical difficulties. Please try again in a moment.',
+      isEmergency: false
+    });
   } catch (error) {
     console.error('AI chat error:', error);
     res.status(500).json({ message: 'Failed to process chat message' });
