@@ -325,8 +325,8 @@ async function retryWithBackoff(fn, maxRetries = 2, initialDelay = 500) {
   }
 }
 
-// Call Gemini API with shorter timeout and fast failure
-async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs = 15000) {
+// Call Gemini API with timeout and therapist-style configuration
+async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs = 20000) {
   return Promise.race([
     retryWithBackoff(async () => {
       const chat = chatHistory.length > 0 
@@ -335,8 +335,10 @@ async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs =
       
       const result = await chat.sendMessage(messageWithContext, {
         generationConfig: {
-          maxOutputTokens: 500, // Limit response length for speed
-          temperature: 0.7,
+          maxOutputTokens: 800, // ~500-600 words (increased from 500)
+          temperature: 0.8, // Slightly higher for more natural, empathetic responses
+          topP: 0.95, // Nucleus sampling for more diverse responses
+          topK: 40, // Top-k sampling for better quality
         }
       });
       
@@ -428,12 +430,21 @@ These services are available 24/7 and are here to help.`,
       });
     }
 
-    // Build context prompt
-    let contextPrompt = 'You are a supportive, empathetic AI assistant for a mental health platform. ';
-    contextPrompt += 'You provide psychological first aid and emotional support. ';
-    contextPrompt += 'You are NOT a medical professional and should not provide diagnoses or medical advice. ';
-    contextPrompt += 'If users express serious concerns, encourage them to seek professional help. ';
-    contextPrompt += 'Keep responses brief (2-3 sentences), warm, and supportive. ';
+    // Build therapist-style context prompt
+    let contextPrompt = 'You are a compassionate, empathetic AI therapist assistant for a mental health platform. ';
+    contextPrompt += 'Your role is to provide therapeutic support, active listening, and evidence-based psychological guidance. ';
+    contextPrompt += 'You are NOT a licensed therapist and cannot provide diagnoses, but you can offer therapeutic techniques, emotional validation, and supportive guidance. ';
+    contextPrompt += 'If users express serious concerns about self-harm, suicide, or severe mental health crises, immediately encourage them to seek professional help and provide emergency resources. ';
+    contextPrompt += 'Your responses should be: ';
+    contextPrompt += '- Approximately 400-600 words in length ';
+    contextPrompt += '- Warm, empathetic, and non-judgmental ';
+    contextPrompt += '- Use therapeutic techniques like active listening, validation, reframing, and gentle questioning ';
+    contextPrompt += '- Ask thoughtful follow-up questions to understand the user better ';
+    contextPrompt += '- Provide practical coping strategies when appropriate ';
+    contextPrompt += '- Use a conversational, supportive tone as a therapist would ';
+    contextPrompt += '- Avoid being overly clinical or robotic ';
+    contextPrompt += '- Focus on the user\'s feelings and experiences ';
+    contextPrompt += 'Remember: You are here to listen, validate, and support. Be genuine and caring in your responses. ';
 
     // Get screening results asynchronously
     const screeningPromise = pool.query(
