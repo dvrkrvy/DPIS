@@ -335,10 +335,8 @@ async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs =
       
       const result = await chat.sendMessage(messageWithContext, {
         generationConfig: {
-          maxOutputTokens: 250, // ~100-200 words (concise but meaningful)
-          temperature: 0.8, // Natural, empathetic responses
-          topP: 0.95, // Nucleus sampling for diverse responses
-          topK: 40, // Top-k sampling for quality
+          maxOutputTokens: 150, // Natural, concise responses
+          temperature: 0.7, // Balanced naturalness
         }
       });
       
@@ -430,22 +428,10 @@ These services are available 24/7 and are here to help.`,
       });
     }
 
-    // Build therapist-style context prompt
-    let contextPrompt = 'You are a compassionate, empathetic AI therapist assistant for a mental health platform. ';
-    contextPrompt += 'Your role is to provide therapeutic support, active listening, and evidence-based psychological guidance. ';
-    contextPrompt += 'You are NOT a licensed therapist and cannot provide diagnoses, but you can offer therapeutic techniques, emotional validation, and supportive guidance. ';
-    contextPrompt += 'If users express serious concerns about self-harm, suicide, or severe mental health crises, immediately encourage them to seek professional help and provide emergency resources. ';
-    contextPrompt += 'IMPORTANT: Your responses should be: ';
-    contextPrompt += '- 100-200 words in length (concise but meaningful) ';
-    contextPrompt += '- Warm, empathetic, and non-judgmental ';
-    contextPrompt += '- Natural and conversational, like talking to a supportive friend who is also a therapist ';
-    contextPrompt += '- Use therapeutic techniques like validation, gentle questioning, and practical suggestions ';
-    contextPrompt += '- Ask 1-2 thoughtful follow-up questions when appropriate ';
-    contextPrompt += '- Provide brief, practical coping strategies when relevant ';
-    contextPrompt += '- DO NOT include meta-instructions like "(Pause...)" or "(Listen attentively...)" - just respond naturally ';
-    contextPrompt += '- DO NOT be overly verbose or repetitive ';
-    contextPrompt += '- Focus on the user\'s feelings and provide genuine, caring support ';
-    contextPrompt += 'Remember: Keep responses concise (100-200 words), natural, and genuinely supportive. ';
+    // Build natural, supportive context prompt
+    let contextPrompt = 'You are a supportive, empathetic AI assistant for a mental health platform. ';
+    contextPrompt += 'Respond naturally and conversationally, like a caring friend who listens well. ';
+    contextPrompt += 'Keep responses brief and genuine. If users express serious concerns about self-harm or suicide, encourage them to seek professional help immediately. ';
 
     // Get screening results asynchronously
     const screeningPromise = pool.query(
