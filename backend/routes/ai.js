@@ -113,22 +113,42 @@ These services are available 24/7 and are here to help.`,
       if (gemini) {
         const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
         
-        // Build conversation history for Gemini
-        let fullPrompt = contextPrompt + '\n\n';
+        // Build conversation history for Gemini using chat format
+        const chatHistory = [];
+        
+        // Add system prompt as first message
+        chatHistory.push({
+          role: 'user',
+          parts: [{ text: contextPrompt }]
+        });
+        
+        // Add conversation history if provided
         if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-          // Add recent conversation history (last 5 exchanges)
+          // Add recent conversation history (last 10 messages = 5 exchanges)
           const recentHistory = conversationHistory.slice(-10);
           for (const msg of recentHistory) {
-            if (msg.role === 'user') {
-              fullPrompt += `User: ${msg.content}\n`;
-            } else if (msg.role === 'assistant') {
-              fullPrompt += `Assistant: ${msg.content}\n`;
+            if (msg.role === 'user' || msg.role === 'assistant') {
+              chatHistory.push({
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: [{ text: msg.content }]
+              });
             }
           }
         }
-        fullPrompt += `\nUser: ${message}\nAssistant:`;
         
-        const result = await model.generateContent(fullPrompt);
+        // Add current user message
+        chatHistory.push({
+          role: 'user',
+          parts: [{ text: message }]
+        });
+        
+        // Start chat session with history
+        const chat = model.startChat({
+          history: chatHistory.slice(0, -1), // All except the last message
+        });
+        
+        // Send the current message
+        const result = await chat.sendMessage(message);
         aiResponse = result.response.text();
       } else if (openai) {
         // Build messages array with conversation history

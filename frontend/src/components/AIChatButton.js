@@ -42,11 +42,15 @@ const AIChatButton = () => {
 
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    
+    // Add user message to state immediately for UI
+    const updatedMessages = [...messages, { role: 'user', content: userMessage }];
+    setMessages(updatedMessages);
     setLoading(true);
 
     try {
-      // Send conversation history for context
+      // Send conversation history for context (excluding the current user message we just added)
+      // We want to send the history BEFORE adding the current message
       const conversationHistory = messages.map(msg => ({
         role: msg.role,
         content: msg.content
@@ -96,17 +100,22 @@ const AIChatButton = () => {
   // Debug: Log authentication status
   useEffect(() => {
     console.log('AIChatButton - isAuthenticated:', isAuthenticated, 'token:', token);
+    console.log('AIChatButton - Component rendered');
   }, [isAuthenticated, token]);
 
-  // Always show button, but require authentication to use chat
-  // This helps with debugging - button will be visible but chat requires login
-
+  // Always show button - no conditional rendering
   return (
     <>
       {/* Floating AI Chat Button - positioned above emergency button */}
       <button
         onClick={handleOpen}
-        className="fixed bottom-28 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl z-[60] flex items-center gap-2 transition-all duration-200 hover:scale-105"
+        style={{
+          position: 'fixed',
+          bottom: '7rem',
+          right: '1.5rem',
+          zIndex: 60,
+        }}
+        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl flex items-center gap-2 transition-all duration-200 hover:scale-105"
         title="AI Support Chat"
       >
         <span className="text-xl">🤖</span>
