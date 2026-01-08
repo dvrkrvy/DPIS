@@ -117,7 +117,8 @@ These services are available 24/7 and are here to help.`,
       // Prefer Gemini if available, otherwise use OpenAI
       if (gemini) {
         try {
-          const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
+          // Use gemini-1.5-flash (faster) or gemini-1.5-pro (more capable)
+          const model = gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
           
           // Build conversation history for Gemini
           const chatHistory = [];
