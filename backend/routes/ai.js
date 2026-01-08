@@ -18,12 +18,23 @@ if (process.env.GEMINI_API_KEY) {
     gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
     
-    // Try to list available models to verify API connection
-    try {
-      const testModel = gemini.getGenerativeModel({ model: 'gemini-pro' });
-      console.log('✅ Verified: gemini-pro model is available');
-    } catch (testError) {
-      console.warn('⚠️ Could not verify gemini-pro model:', testError.message);
+    // Test different model names to find which one works
+    const modelNames = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro', 'gemini-1.0-pro'];
+    let workingModel = null;
+    
+    for (const modelName of modelNames) {
+      try {
+        const testModel = gemini.getGenerativeModel({ model: modelName });
+        workingModel = modelName;
+        console.log(`✅ Found working model: ${modelName}`);
+        break;
+      } catch (testError) {
+        console.log(`⚠️ Model ${modelName} not available: ${testError.message.split('\n')[0]}`);
+      }
+    }
+    
+    if (!workingModel) {
+      console.warn('⚠️ No working Gemini model found. Will try gemini-1.5-flash as default.');
     }
   } catch (error) {
     console.error('❌ Gemini initialization error:', error.message);
@@ -126,9 +137,25 @@ These services are available 24/7 and are here to help.`,
       if (gemini) {
         try {
           console.log('🤖 Attempting to use Gemini API...');
-          // Use gemini-pro (the stable model name)
-          const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
-          console.log('✅ Gemini model loaded: gemini-pro');
+          // Try multiple model names in order of preference
+          let model;
+          const modelNames = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro'];
+          let modelLoaded = false;
+          
+          for (const modelName of modelNames) {
+            try {
+              model = gemini.getGenerativeModel({ model: modelName });
+              console.log(`✅ Gemini model loaded: ${modelName}`);
+              modelLoaded = true;
+              break;
+            } catch (modelError) {
+              console.log(`⚠️ Model ${modelName} failed: ${modelError.message.split('\n')[0]}`);
+            }
+          }
+          
+          if (!modelLoaded) {
+            throw new Error('No available Gemini model found. Tried: ' + modelNames.join(', '));
+          }
           
           // Build conversation history for Gemini
           const chatHistory = [];
