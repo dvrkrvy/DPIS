@@ -9,12 +9,29 @@ router.get('/', authenticate, async (req, res) => {
     const { category, contentType, search, personalized } = req.query;
     const userId = req.user.id;
     
+    // First check if personalized columns exist in the database
+    // Default to false if check fails - will use backward-compatible queries
+    let hasPersonalizationColumns = false;
+    try {
+      const columnCheck = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'resources' 
+        AND column_name IN ('test_types', 'severity_levels', 'priority')
+      `);
+      hasPersonalizationColumns = columnCheck.rows.length === 3;
+    } catch (colError) {
+      // If we can't check columns, assume they don't exist (safe default)
+      console.warn('Could not check for personalization columns, using backward-compatible mode:', colError.message);
+      hasPersonalizationColumns = false;
+    }
+    
     let query = 'SELECT * FROM resources WHERE is_active = true';
     const params = [];
     let paramCount = 0;
 
-    // If personalized is true, filter based on user's last 3 test results
-    if (personalized === 'true' && req.user.role === 'student') {
+    // If personalized is true and columns exist, filter based on user's last 3 test results
+    if (personalized === 'true' && req.user.role === 'student' && hasPersonalizationColumns) {
       // Get user's last 3 test results
       const testResults = await pool.query(
         `SELECT test_type, severity 
@@ -44,15 +61,24 @@ router.get('/', authenticate, async (req, res) => {
           query += ` AND (${conditions.join(' OR ')})`;
         }
 
-        // Order by priority (higher priority first), then by created date
-        query += ' ORDER BY priority DESC, created_at DESC LIMIT 50';
+        // Order by priority if column exists, otherwise just by created date
+        if (hasPersonalizationColumns) {
+          query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 50';
+        } else {
+          query += ' ORDER BY created_at DESC LIMIT 50';
+        }
       } else {
         // No test results yet - return general resources (those without test-specific targeting)
-        query += ' AND (test_types IS NULL OR array_length(test_types, 1) IS NULL)';
-        query += ' ORDER BY priority DESC, created_at DESC';
+        if (hasPersonalizationColumns) {
+          query += ' AND (test_types IS NULL OR array_length(test_types, 1) IS NULL)';
+          query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC';
+        } else {
+          // If columns don't exist, just return all active resources
+          query += ' ORDER BY created_at DESC';
+        }
       }
     } else {
-      // Regular filtering without personalization
+      // Regular filtering without personalization (or if columns don't exist)
       if (category) {
         paramCount++;
         query += ` AND category = $${paramCount}`;
@@ -71,7 +97,12 @@ router.get('/', authenticate, async (req, res) => {
         params.push(`%${search}%`);
       }
 
-      query += ' ORDER BY priority DESC, created_at DESC';
+      // Only use priority if column exists
+      if (hasPersonalizationColumns) {
+        query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC';
+      } else {
+        query += ' ORDER BY created_at DESC';
+      }
     }
 
     const result = await pool.query(query, params);
@@ -79,21 +110,34 @@ router.get('/', authenticate, async (req, res) => {
     // Get test results count for personalized responses
     let testResultsCount = null;
     if (personalized === 'true' && req.user.role === 'student') {
-      const countResult = await pool.query(
-        'SELECT COUNT(*) as count FROM screening_results WHERE user_id = $1', 
-        [userId]
-      );
-      testResultsCount = parseInt(countResult.rows[0].count);
+      try {
+        const countResult = await pool.query(
+          'SELECT COUNT(*) as count FROM screening_results WHERE user_id = $1', 
+          [userId]
+        );
+        testResultsCount = parseInt(countResult.rows[0].count);
+      } catch (countError) {
+        console.warn('Could not get test results count:', countError.message);
+      }
     }
     
     res.json({ 
       resources: result.rows,
-      personalized: personalized === 'true',
+      personalized: personalized === 'true' && hasPersonalizationColumns,
       testResultsCount: testResultsCount
     });
   } catch (error) {
     console.error('Get resources error:', error);
-    res.status(500).json({ message: 'Failed to fetch resources' });
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint
+    });
+    res.status(500).json({ 
+      message: 'Failed to fetch resources',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

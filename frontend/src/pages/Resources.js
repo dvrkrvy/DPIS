@@ -64,8 +64,14 @@ const Resources = () => {
       setTestResultsCount(response.data.testResultsCount);
     } catch (error) {
       console.error('Failed to fetch resources:', error);
-      toast.error('Failed to fetch resources');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch resources';
+      toast.error(errorMessage);
       setResources([]);
+      
+      // Log more details for debugging
+      if (error.response?.data?.error) {
+        console.error('Detailed error:', error.response.data.error);
+      }
     } finally {
       setLoading(false);
     }
