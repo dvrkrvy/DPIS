@@ -31,15 +31,14 @@ function AIChatButton() {
     return null;
   }
 
-  // Floating AI Chat button - same size as Emergency, slightly above it
+  // Floating AI Chat button - exact same size as Emergency, slightly above it
   return (
     <button
       onClick={() => navigate('/ai-chat')}
-      className="fixed bottom-24 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg flex items-center gap-2 transition-all duration-200 hover:scale-105"
-      style={{ zIndex: 60 }}
+      className="fixed bottom-20 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-50 flex items-center gap-2"
       title="AI Support Chat"
     >
-      <span className="text-xl">🤖</span>
+      <span>🤖</span>
       <span>AI Chat</span>
     </button>
   );
