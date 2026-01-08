@@ -17,16 +17,16 @@ The system now supports **3 Gemini API keys** with automatic rotation and failov
    - **Other errors**: 1 minute cooldown (after 3 failures)
 4. **Auto-Recovery**: Keys automatically re-enable after cooldown period
 
-## Setup Instructions
+## Setup Instructions (up to 10 keys)
 
-### Step 1: Get 3 Gemini API Keys
+### Step 1: Get up to 10 Gemini API Keys
 
 1. Go to https://aistudio.google.com/apikey
 2. Sign in with your Google account
-3. Create **3 separate API keys**:
+3. Create up to **10 separate API keys** (minimum 1, recommended 3–10):
    - Click "Create API Key" → Create new project → Copy key 1
    - Click "Create API Key" again → Use existing project → Copy key 2
-   - Click "Create API Key" again → Use existing project → Copy key 3
+   - Repeat until you have as many keys as you need (up to 10)
 
 **Important**: Each key should be from the same Google account but can be in different projects.
 
@@ -35,12 +35,19 @@ The system now supports **3 Gemini API keys** with automatic rotation and failov
 1. Go to **Render Dashboard**: https://dashboard.render.com
 2. Select your **backend service** (e.g., `dpis-backend`)
 3. Go to **"Environment"** tab
-4. Add/Edit these **3 environment variables**:
+4. Add/Edit these environment variables (as many as you have, up to 10):
 
    ```
    GEMINI_API_KEY=your-first-api-key-here
    GEMINI_API_KEY_2=your-second-api-key-here
    GEMINI_API_KEY_3=your-third-api-key-here
+   GEMINI_API_KEY_4=your-fourth-api-key-here
+   GEMINI_API_KEY_5=your-fifth-api-key-here
+   GEMINI_API_KEY_6=your-sixth-api-key-here
+   GEMINI_API_KEY_7=your-seventh-api-key-here
+   GEMINI_API_KEY_8=your-eighth-api-key-here
+   GEMINI_API_KEY_9=your-ninth-api-key-here
+   GEMINI_API_KEY_10=your-tenth-api-key-here
    ```
 
 5. **Click "Save Changes"**
@@ -49,12 +56,19 @@ The system now supports **3 Gemini API keys** with automatic rotation and failov
 ### Step 3: Add Keys Locally (Development)
 
 1. Open `backend/.env` file
-2. Add these lines:
+2. Add these lines (add as many as you have, up to 10):
 
    ```
    GEMINI_API_KEY=your-first-api-key-here
    GEMINI_API_KEY_2=your-second-api-key-here
    GEMINI_API_KEY_3=your-third-api-key-here
+   GEMINI_API_KEY_4=your-fourth-api-key-here
+   GEMINI_API_KEY_5=your-fifth-api-key-here
+   GEMINI_API_KEY_6=your-sixth-api-key-here
+   GEMINI_API_KEY_7=your-seventh-api-key-here
+   GEMINI_API_KEY_8=your-eighth-api-key-here
+   GEMINI_API_KEY_9=your-ninth-api-key-here
+   GEMINI_API_KEY_10=your-tenth-api-key-here
    ```
 
 3. **Restart your backend server**:

@@ -78,12 +78,14 @@ async function listAvailableGeminiModels(apiKey) {
 function initializeGeminiKeys() {
   const { GoogleGenerativeAI } = require('@google/generative-ai');
   
-  // Get all API keys from environment (GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3)
-  const keys = [
-    process.env.GEMINI_API_KEY,
-    process.env.GEMINI_API_KEY_2,
-    process.env.GEMINI_API_KEY_3
-  ].filter(key => key && key.trim() !== ''); // Remove empty keys
+  // Get all API keys from environment (up to 10 keys: GEMINI_API_KEY, GEMINI_API_KEY_2 ... GEMINI_API_KEY_10)
+  const keys = [];
+  const baseKey = process.env.GEMINI_API_KEY;
+  if (baseKey && baseKey.trim() !== '') keys.push(baseKey);
+  for (let i = 2; i <= 10; i++) {
+    const k = process.env[`GEMINI_API_KEY_${i}`];
+    if (k && k.trim() !== '') keys.push(k);
+  }
   
   if (keys.length === 0) {
     console.warn('⚠️ No GEMINI_API_KEY found in environment variables');
