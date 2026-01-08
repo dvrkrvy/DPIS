@@ -118,9 +118,16 @@ These services are available 24/7 and are here to help.`,
       if (gemini) {
         try {
           console.log('🤖 Attempting to use Gemini API...');
-          // Use gemini-1.5-flash (faster) or gemini-1.5-pro (more capable)
-          const model = gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
-          console.log('✅ Gemini model loaded: gemini-1.5-flash');
+          // Try gemini-1.0-pro first (most stable), fallback to gemini-pro
+          let model;
+          try {
+            model = gemini.getGenerativeModel({ model: 'gemini-1.0-pro' });
+            console.log('✅ Gemini model loaded: gemini-1.0-pro');
+          } catch (modelError) {
+            console.warn('⚠️ gemini-1.0-pro not available, trying gemini-pro...');
+            model = gemini.getGenerativeModel({ model: 'gemini-pro' });
+            console.log('✅ Gemini model loaded: gemini-pro');
+          }
           
           // Build conversation history for Gemini
           const chatHistory = [];
