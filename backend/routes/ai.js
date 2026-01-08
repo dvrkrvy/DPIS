@@ -9,6 +9,7 @@ const router = express.Router();
 // Try to use Gemini first if available, otherwise fall back to OpenAI
 let gemini = null;
 let openai = null;
+let geminiModelName = null; // Store the working model name
 
 // Initialize Gemini if API key is available
 console.log('🔍 Checking for GEMINI_API_KEY...', process.env.GEMINI_API_KEY ? 'Found' : 'Not found');
@@ -18,24 +19,11 @@ if (process.env.GEMINI_API_KEY) {
     gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
     
-    // Test different model names to find which one works
-    const modelNames = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro', 'gemini-1.0-pro'];
-    let workingModel = null;
-    
-    for (const modelName of modelNames) {
-      try {
-        const testModel = gemini.getGenerativeModel({ model: modelName });
-        workingModel = modelName;
-        console.log(`✅ Found working model: ${modelName}`);
-        break;
-      } catch (testError) {
-        console.log(`⚠️ Model ${modelName} not available: ${testError.message.split('\n')[0]}`);
-      }
-    }
-    
-    if (!workingModel) {
-      console.warn('⚠️ No working Gemini model found. Will try gemini-1.5-flash as default.');
-    }
+    // Test different model names to find which one works by actually testing the API
+    // We'll find the working model during the first API call since getGenerativeModel doesn't test the API
+    const modelNames = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-pro'];
+    console.log('📋 Will test models in order:', modelNames.join(', '));
+    geminiModelName = modelNames[0]; // Default to first one, will be updated on first successful call
   } catch (error) {
     console.error('❌ Gemini initialization error:', error.message);
     console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
@@ -137,56 +125,67 @@ These services are available 24/7 and are here to help.`,
       if (gemini) {
         try {
           console.log('🤖 Attempting to use Gemini API...');
-          // Try multiple model names in order of preference
-          let model;
-          const modelNames = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro'];
-          let modelLoaded = false;
+          // Try multiple model names in order of preference until one works
+          const modelNames = geminiModelName 
+            ? [geminiModelName, 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-pro']
+            : ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-pro'];
           
+          let model = null;
+          let workingModelName = null;
+          
+          // Try each model by actually making an API call
           for (const modelName of modelNames) {
             try {
+              console.log(`🔄 Trying model: ${modelName}...`);
               model = gemini.getGenerativeModel({ model: modelName });
-              console.log(`✅ Gemini model loaded: ${modelName}`);
-              modelLoaded = true;
-              break;
+              
+              // Build conversation history for Gemini
+              const chatHistory = [];
+              
+              // Add conversation history if provided (exclude the initial greeting)
+              if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 1) {
+                // Skip the first message (greeting) and get last 8 messages (4 exchanges)
+                const recentHistory = conversationHistory.slice(1, -1).slice(-8);
+                for (const msg of recentHistory) {
+                  if (msg.role === 'user' || msg.role === 'assistant') {
+                    chatHistory.push({
+                      role: msg.role === 'user' ? 'user' : 'model',
+                      parts: [{ text: msg.content }]
+                    });
+                  }
+                }
+              }
+              
+              // Start chat session with history
+              const chat = chatHistory.length > 0 
+                ? model.startChat({ history: chatHistory })
+                : model.startChat();
+              
+              console.log('📤 Sending message to Gemini...');
+              // Actually test the API call - this is where it will fail if model doesn't work
+              const result = await chat.sendMessage(message);
+              aiResponse = result.response.text();
+              workingModelName = modelName;
+              
+              // Store the working model name for future requests
+              if (!geminiModelName || geminiModelName !== modelName) {
+                geminiModelName = modelName;
+                console.log(`✅ Found and stored working model: ${modelName}`);
+              }
+              
+              console.log('✅ Received response from Gemini, length:', aiResponse?.length || 0);
+              break; // Success! Exit the loop
+              
             } catch (modelError) {
-              console.log(`⚠️ Model ${modelName} failed: ${modelError.message.split('\n')[0]}`);
+              console.log(`❌ Model ${modelName} failed: ${modelError.message.split('\n')[0]}`);
+              // Continue to next model
+              continue;
             }
           }
           
-          if (!modelLoaded) {
+          if (!workingModelName) {
             throw new Error('No available Gemini model found. Tried: ' + modelNames.join(', '));
           }
-          
-          // Build conversation history for Gemini
-          const chatHistory = [];
-          
-          // Add conversation history if provided (exclude the initial greeting)
-          if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 1) {
-            // Skip the first message (greeting) and get last 8 messages (4 exchanges)
-            const recentHistory = conversationHistory.slice(1, -1).slice(-8);
-            for (const msg of recentHistory) {
-              if (msg.role === 'user' || msg.role === 'assistant') {
-                chatHistory.push({
-                  role: msg.role === 'user' ? 'user' : 'model',
-                  parts: [{ text: msg.content }]
-                });
-              }
-            }
-          }
-          
-          // Start chat session with history
-          const chat = chatHistory.length > 0 
-            ? model.startChat({ history: chatHistory })
-            : model.startChat();
-          
-          // Combine context and message for simpler approach
-          const fullPrompt = `${contextPrompt}\n\nUser: ${message}\nAssistant:`;
-          
-          console.log('📤 Sending message to Gemini...');
-          // Send the message (use sendMessage with just the message text, not fullPrompt in history mode)
-          const result = await chat.sendMessage(message);
-          aiResponse = result.response.text();
-          console.log('✅ Received response from Gemini, length:', aiResponse?.length || 0);
         } catch (geminiError) {
           console.error('❌ Gemini API error:', geminiError);
           console.error('❌ Gemini API error details:', JSON.stringify(geminiError, null, 2));
