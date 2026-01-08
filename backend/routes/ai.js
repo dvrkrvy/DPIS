@@ -117,8 +117,10 @@ These services are available 24/7 and are here to help.`,
       // Prefer Gemini if available, otherwise use OpenAI
       if (gemini) {
         try {
+          console.log('🤖 Attempting to use Gemini API...');
           // Use gemini-1.5-flash (faster) or gemini-1.5-pro (more capable)
           const model = gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
+          console.log('✅ Gemini model loaded: gemini-1.5-flash');
           
           // Build conversation history for Gemini
           const chatHistory = [];
@@ -142,15 +144,27 @@ These services are available 24/7 and are here to help.`,
             ? model.startChat({ history: chatHistory })
             : model.startChat();
           
-          // Build the prompt with context
-          const fullPrompt = `${contextPrompt}\n\n${message}`;
+          // Combine context and message for simpler approach
+          const fullPrompt = `${contextPrompt}\n\nUser: ${message}\nAssistant:`;
           
-          // Send the message
-          const result = await chat.sendMessage(fullPrompt);
+          console.log('📤 Sending message to Gemini...');
+          // Send the message (use sendMessage with just the message text, not fullPrompt in history mode)
+          const result = await chat.sendMessage(message);
           aiResponse = result.response.text();
+          console.log('✅ Received response from Gemini, length:', aiResponse?.length || 0);
         } catch (geminiError) {
-          console.error('❌ Gemini API error:', geminiError.message);
-          throw geminiError;
+          console.error('❌ Gemini API error:', geminiError);
+          console.error('❌ Gemini API error details:', JSON.stringify(geminiError, null, 2));
+          // Fall back to OpenAI if available, otherwise return error message
+          if (openai) {
+            console.log('⚠️ Falling back to OpenAI due to Gemini error');
+          } else {
+            // Return a helpful error message instead of crashing
+            return res.json({
+              message: 'I\'m experiencing some technical difficulties with the AI service. Please try again in a moment, or contact support if the issue persists.',
+              isEmergency: false
+            });
+          }
         }
       } else if (openai) {
         // Build messages array with conversation history

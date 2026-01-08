@@ -99,11 +99,11 @@ const AIChatButton = () => {
 
   // Debug: Log authentication status
   useEffect(() => {
-    console.log('AIChatButton - isAuthenticated:', isAuthenticated, 'token:', token);
-    console.log('AIChatButton - Component rendered');
+    console.log('🤖 AIChatButton - isAuthenticated:', isAuthenticated, 'token exists:', !!token);
+    console.log('🤖 AIChatButton - Component rendered at:', new Date().toISOString());
   }, [isAuthenticated, token]);
 
-  // Always show button - no conditional rendering
+  // Always show button - render regardless of auth (but require auth to use)
   return (
     <>
       {/* Floating AI Chat Button - positioned above emergency button */}
@@ -111,12 +111,16 @@ const AIChatButton = () => {
         onClick={handleOpen}
         style={{
           position: 'fixed',
-          bottom: '7rem',
-          right: '1.5rem',
+          bottom: '112px', // 7rem = 112px
+          right: '24px', // 1.5rem = 24px
           zIndex: 60,
+          display: 'block',
+          visibility: 'visible',
+          opacity: 1,
         }}
         className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl flex items-center gap-2 transition-all duration-200 hover:scale-105"
         title="AI Support Chat"
+        id="ai-chat-button"
       >
         <span className="text-xl">🤖</span>
         <span>AI Chat</span>
