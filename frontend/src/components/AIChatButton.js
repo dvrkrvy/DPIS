@@ -34,6 +34,12 @@ const AIChatButton = () => {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
+    // Require authentication to send messages
+    if (!isAuthenticated || !token) {
+      toast.error('Please log in to use the AI chat');
+      return;
+    }
+
     const userMessage = input.trim();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
@@ -89,13 +95,11 @@ const AIChatButton = () => {
 
   // Debug: Log authentication status
   useEffect(() => {
-    console.log('AIChatButton - isAuthenticated:', isAuthenticated);
-  }, [isAuthenticated]);
+    console.log('AIChatButton - isAuthenticated:', isAuthenticated, 'token:', token);
+  }, [isAuthenticated, token]);
 
-  if (!isAuthenticated) {
-    console.log('AIChatButton - Not authenticated, not rendering');
-    return null;
-  }
+  // Always show button, but require authentication to use chat
+  // This helps with debugging - button will be visible but chat requires login
 
   return (
     <>
