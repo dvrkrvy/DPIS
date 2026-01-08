@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
 
@@ -30,41 +29,6 @@ const EmergencyButton = () => {
 
   return (
     <>
-      {/* AI Chat Button - positioned above emergency button */}
-      <button
-        onClick={() => navigate('/ai-chat')}
-        style={{ 
-          position: 'fixed',
-          bottom: '140px',
-          right: '24px',
-          zIndex: 9999,
-          background: 'linear-gradient(to right, #2563eb, #9333ea)',
-          color: 'white',
-          fontWeight: 'bold',
-          padding: '12px 24px',
-          borderRadius: '9999px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          cursor: 'pointer',
-          border: 'none',
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.target.style.transform = 'scale(1.05)';
-          e.target.style.background = 'linear-gradient(to right, #1d4ed8, #7e22ce)';
-        }}
-        onMouseLeave={(e) => {
-          e.target.style.transform = 'scale(1)';
-          e.target.style.background = 'linear-gradient(to right, #2563eb, #9333ea)';
-        }}
-        title="AI Support Chat"
-      >
-        <span style={{ fontSize: '20px' }}>🤖</span>
-        <span>AI Chat</span>
-      </button>
-
       {/* Emergency button only shows when authenticated */}
       {isAuthenticated && (
         <>
