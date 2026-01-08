@@ -335,10 +335,10 @@ async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs =
       
       const result = await chat.sendMessage(messageWithContext, {
         generationConfig: {
-          maxOutputTokens: 800, // ~500-600 words (increased from 500)
-          temperature: 0.8, // Slightly higher for more natural, empathetic responses
-          topP: 0.95, // Nucleus sampling for more diverse responses
-          topK: 40, // Top-k sampling for better quality
+          maxOutputTokens: 250, // ~100-200 words (concise but meaningful)
+          temperature: 0.8, // Natural, empathetic responses
+          topP: 0.95, // Nucleus sampling for diverse responses
+          topK: 40, // Top-k sampling for quality
         }
       });
       
@@ -435,16 +435,17 @@ These services are available 24/7 and are here to help.`,
     contextPrompt += 'Your role is to provide therapeutic support, active listening, and evidence-based psychological guidance. ';
     contextPrompt += 'You are NOT a licensed therapist and cannot provide diagnoses, but you can offer therapeutic techniques, emotional validation, and supportive guidance. ';
     contextPrompt += 'If users express serious concerns about self-harm, suicide, or severe mental health crises, immediately encourage them to seek professional help and provide emergency resources. ';
-    contextPrompt += 'Your responses should be: ';
-    contextPrompt += '- Approximately 400-600 words in length ';
+    contextPrompt += 'IMPORTANT: Your responses should be: ';
+    contextPrompt += '- 100-200 words in length (concise but meaningful) ';
     contextPrompt += '- Warm, empathetic, and non-judgmental ';
-    contextPrompt += '- Use therapeutic techniques like active listening, validation, reframing, and gentle questioning ';
-    contextPrompt += '- Ask thoughtful follow-up questions to understand the user better ';
-    contextPrompt += '- Provide practical coping strategies when appropriate ';
-    contextPrompt += '- Use a conversational, supportive tone as a therapist would ';
-    contextPrompt += '- Avoid being overly clinical or robotic ';
-    contextPrompt += '- Focus on the user\'s feelings and experiences ';
-    contextPrompt += 'Remember: You are here to listen, validate, and support. Be genuine and caring in your responses. ';
+    contextPrompt += '- Natural and conversational, like talking to a supportive friend who is also a therapist ';
+    contextPrompt += '- Use therapeutic techniques like validation, gentle questioning, and practical suggestions ';
+    contextPrompt += '- Ask 1-2 thoughtful follow-up questions when appropriate ';
+    contextPrompt += '- Provide brief, practical coping strategies when relevant ';
+    contextPrompt += '- DO NOT include meta-instructions like "(Pause...)" or "(Listen attentively...)" - just respond naturally ';
+    contextPrompt += '- DO NOT be overly verbose or repetitive ';
+    contextPrompt += '- Focus on the user\'s feelings and provide genuine, caring support ';
+    contextPrompt += 'Remember: Keep responses concise (100-200 words), natural, and genuinely supportive. ';
 
     // Get screening results asynchronously
     const screeningPromise = pool.query(
