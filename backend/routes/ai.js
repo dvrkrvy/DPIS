@@ -1,5 +1,6 @@
 const express = require('express');
 const OpenAI = require('openai');
+require('dotenv').config();
 const pool = require('../config/database');
 const { authenticate, requireStudent } = require('../middleware/auth');
 const router = express.Router();
@@ -10,14 +11,18 @@ let gemini = null;
 let openai = null;
 
 // Initialize Gemini if API key is available
+console.log('🔍 Checking for GEMINI_API_KEY...', process.env.GEMINI_API_KEY ? 'Found' : 'Not found');
 if (process.env.GEMINI_API_KEY) {
   try {
     const { GoogleGenerativeAI } = require('@google/generative-ai');
     gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    console.log('✅ Gemini AI initialized');
+    console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
   } catch (error) {
+    console.error('❌ Gemini initialization error:', error.message);
     console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
   }
+} else {
+  console.warn('⚠️ GEMINI_API_KEY not found in environment variables');
 }
 
 // Initialize OpenAI if API key is available
@@ -111,45 +116,41 @@ These services are available 24/7 and are here to help.`,
 
       // Prefer Gemini if available, otherwise use OpenAI
       if (gemini) {
-        const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
-        
-        // Build conversation history for Gemini using chat format
-        const chatHistory = [];
-        
-        // Add system prompt as first message
-        chatHistory.push({
-          role: 'user',
-          parts: [{ text: contextPrompt }]
-        });
-        
-        // Add conversation history if provided
-        if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
-          // Add recent conversation history (last 10 messages = 5 exchanges)
-          const recentHistory = conversationHistory.slice(-10);
-          for (const msg of recentHistory) {
-            if (msg.role === 'user' || msg.role === 'assistant') {
-              chatHistory.push({
-                role: msg.role === 'user' ? 'user' : 'model',
-                parts: [{ text: msg.content }]
-              });
+        try {
+          const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
+          
+          // Build conversation history for Gemini
+          const chatHistory = [];
+          
+          // Add conversation history if provided (exclude the initial greeting)
+          if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 1) {
+            // Skip the first message (greeting) and get last 8 messages (4 exchanges)
+            const recentHistory = conversationHistory.slice(1, -1).slice(-8);
+            for (const msg of recentHistory) {
+              if (msg.role === 'user' || msg.role === 'assistant') {
+                chatHistory.push({
+                  role: msg.role === 'user' ? 'user' : 'model',
+                  parts: [{ text: msg.content }]
+                });
+              }
             }
           }
+          
+          // Start chat session with history
+          const chat = chatHistory.length > 0 
+            ? model.startChat({ history: chatHistory })
+            : model.startChat();
+          
+          // Build the prompt with context
+          const fullPrompt = `${contextPrompt}\n\n${message}`;
+          
+          // Send the message
+          const result = await chat.sendMessage(fullPrompt);
+          aiResponse = result.response.text();
+        } catch (geminiError) {
+          console.error('❌ Gemini API error:', geminiError.message);
+          throw geminiError;
         }
-        
-        // Add current user message
-        chatHistory.push({
-          role: 'user',
-          parts: [{ text: message }]
-        });
-        
-        // Start chat session with history
-        const chat = model.startChat({
-          history: chatHistory.slice(0, -1), // All except the last message
-        });
-        
-        // Send the current message
-        const result = await chat.sendMessage(message);
-        aiResponse = result.response.text();
       } else if (openai) {
         // Build messages array with conversation history
         const messages = [

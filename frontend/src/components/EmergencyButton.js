@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
+import AIChatButton from './AIChatButton';
 
 const EmergencyButton = () => {
   const { isAuthenticated, token } = useAuth();
@@ -30,6 +31,9 @@ const EmergencyButton = () => {
 
   return (
     <>
+      {/* AI Chat Button - positioned above emergency button */}
+      <AIChatButton />
+      
       <button
         onClick={fetchContacts}
         className="fixed bottom-6 right-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-50 flex items-center gap-2"
