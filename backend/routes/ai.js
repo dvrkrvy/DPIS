@@ -31,9 +31,15 @@ let activeRequests = 0;
 const responseCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Multi-key Gemini AI provider system
-let geminiClients = []; // Array of { client, key, isActive, lastError }
-let geminiModelName = null;
+// Multi-key Gemini AI provider system with Gemma model rotation
+let geminiClients = []; // Array of { client, key, isActive, lastError, currentModelIndex }
+let gemmaModels = [
+  'gemma-3-12b',
+  'gemma-3-1b', 
+  'gemma-3-27b',
+  'gemma-3-2b',
+  'gemma-3-4b'
+]; // 5 Gemma models with 14.4K RPD each = 72K requests/day per API key
 let currentKeyIndex = 0; // Round-robin index
 
 // Function to list available Gemini models
@@ -119,34 +125,15 @@ function initializeGeminiKeys() {
     return;
   }
   
-  // Prefer flash model for speed (use 1.5-flash, not 2.5-flash)
-  geminiModelName = 'gemini-1.5-flash';
-  console.log(`✅ Will use model: ${geminiModelName} (optimized for speed)`);
-  console.log(`✅ Multi-key system ready with ${geminiClients.length} active key(s)`);
-  
-  // Verify model availability in background (use first key)
-  if (geminiClients.length > 0) {
-    listAvailableGeminiModels(geminiClients[0].fullKey)
-      .then((models) => {
-        if (models && models.length > 0) {
-          console.log('📋 Available Gemini models:', models.join(', '));
-          // Prefer 1.5-flash if available (not 2.5-flash which may not exist)
-          const flashModel = models.find(m => m.includes('1.5-flash') || m.includes('flash'));
-          if (flashModel && !flashModel.includes('2.5')) {
-            geminiModelName = flashModel;
-          } else {
-            // Fallback to first available model that's not 2.5
-            const safeModel = models.find(m => !m.includes('2.5')) || models[0];
-            geminiModelName = safeModel;
-          }
-          console.log(`✅ Using optimized model: ${geminiModelName}`);
-        }
-      })
-      .catch((listError) => {
-        console.warn('⚠️ Could not list available models:', listError.message);
-        console.warn('⚠️ Will use default model: gemini-1.5-flash');
-      });
-  }
+    // Initialize each client with Gemma model rotation
+    geminiClients.forEach(client => {
+      client.currentModelIndex = 0; // Start with first Gemma model
+      client.modelFailures = {}; // Track failures per model
+    });
+    
+    console.log(`✅ Using Gemma models with 14.4K RPD each: ${gemmaModels.join(', ')}`);
+    console.log(`✅ Total capacity per API key: ${gemmaModels.length * 14400} requests/day`);
+    console.log(`✅ Multi-key system ready with ${geminiClients.length} active key(s)`);
 }
 
 // Initialize Gemini keys
@@ -157,7 +144,7 @@ try {
   console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
 }
 
-// Get next available Gemini client (round-robin with fallback)
+// Get next available Gemini client with model rotation
 function getNextGeminiClient() {
   if (geminiClients.length === 0) return null;
   
@@ -170,6 +157,8 @@ function getNextGeminiClient() {
     geminiClients.forEach(c => {
       c.isActive = true;
       c.errorCount = 0;
+      c.currentModelIndex = 0;
+      c.modelFailures = {};
     });
     return geminiClients[0];
   }
@@ -179,6 +168,38 @@ function getNextGeminiClient() {
   currentKeyIndex = (currentKeyIndex + 1) % activeClients.length;
   
   return client;
+}
+
+// Get next available Gemma model for a client
+function getNextGemmaModel(client) {
+  // Try models in rotation, skipping ones that have failed recently
+  const maxAttempts = gemmaModels.length;
+  
+  for (let i = 0; i < maxAttempts; i++) {
+    const modelIndex = (client.currentModelIndex + i) % gemmaModels.length;
+    const modelName = gemmaModels[modelIndex];
+    
+    // Skip models that have failed recently (within last 5 minutes)
+    const failureTime = client.modelFailures[modelName];
+    if (failureTime && Date.now() - failureTime < 5 * 60 * 1000) {
+      continue; // Skip this model, try next
+    }
+    
+    // Found an available model
+    client.currentModelIndex = (modelIndex + 1) % gemmaModels.length; // Advance for next time
+    return modelName;
+  }
+  
+  // All models failed, reset and try first one
+  client.modelFailures = {};
+  client.currentModelIndex = 1;
+  return gemmaModels[0];
+}
+
+// Mark a Gemma model as failed
+function markModelFailed(client, modelName) {
+  client.modelFailures[modelName] = Date.now();
+  console.warn(`⚠️ Model ${modelName} failed for key ${client.index + 1}. Will skip for 5 minutes.`);
 }
 
 // Mark a client as failed (temporarily disable for quota/rate limit errors)
@@ -377,9 +398,9 @@ These services are available 24/7 and are here to help.`,
     let lastError = null;
     let quotaErrors = 0; // Track how many keys hit quota
 
-    // Try each available Gemini client until one works (max 3 attempts for speed)
-    const maxAttempts = Math.min(geminiClients.length, 3); // Try max 3 keys before giving up
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Try each available Gemini client with Gemma model rotation
+    const maxKeyAttempts = Math.min(geminiClients.length, 3); // Try max 3 keys before giving up
+    for (let keyAttempt = 0; keyAttempt < maxKeyAttempts; keyAttempt++) {
       const geminiClient = getNextGeminiClient();
       
       if (!geminiClient) {
@@ -387,17 +408,16 @@ These services are available 24/7 and are here to help.`,
         break;
       }
       
-      try {
-        // Ensure we use 1.5-flash, not 2.5-flash (which may not exist or have different limits)
-        let modelToUse = geminiModelName || 'gemini-1.5-flash';
-        // Force 1.5-flash if somehow 2.5 got set
-        if (modelToUse.includes('2.5')) {
-          console.warn('⚠️ Detected 2.5 model, switching to 1.5-flash');
-          modelToUse = 'gemini-1.5-flash';
-        }
+      // Try all 5 Gemma models for this key before moving to next key
+      const maxModelAttempts = gemmaModels.length;
+      let modelSuccess = false;
+      
+      for (let modelAttempt = 0; modelAttempt < maxModelAttempts; modelAttempt++) {
+        const modelToUse = getNextGemmaModel(geminiClient);
         
-        console.log(`🤖 Using Gemini key ${geminiClient.index + 1} (${geminiClient.key})`);
-        const model = geminiClient.client.getGenerativeModel({ model: modelToUse });
+        try {
+          console.log(`🤖 Using key ${geminiClient.index + 1} (${geminiClient.key}) with model ${modelToUse}`);
+          const model = geminiClient.client.getGenerativeModel({ model: modelToUse });
       
       // Build conversation history (limit to last 4 messages for speed)
       const chatHistory = [];
@@ -420,60 +440,73 @@ These services are available 24/7 and are here to help.`,
         contextPrompt += `The user recently completed a ${latest.test_type} screening with a ${latest.severity} severity score (${latest.score}). `;
       }
       
-        const messageWithContext = contextPrompt + '\n\nUser: ' + message;
-        
-        console.log('📤 Sending message to Gemini...');
-        const startTime = Date.now();
-        
-        aiResponse = await callGeminiAPI(model, messageWithContext, chatHistory);
-        
-        const responseTime = Date.now() - startTime;
-        console.log(`✅ Received response from Gemini key ${geminiClient.index + 1} in ${responseTime}ms`);
-        
-        // Cache response
-        if (!detectRiskKeywords(message)) {
-          responseCache.set(cacheKey, {
-            response: aiResponse,
-            timestamp: Date.now()
-          });
-          // Clean old cache entries (keep cache under 100 entries)
-          if (responseCache.size > 100) {
-            const oldestKey = responseCache.keys().next().value;
-            responseCache.delete(oldestKey);
-          }
-        }
-        
-        // Success! Return response
-        return res.json({
-          message: aiResponse,
-          isEmergency: false
-        });
-        
-      } catch (geminiError) {
-        console.error(`❌ Gemini API error with key ${geminiClient.index + 1}:`, geminiError.message);
-        lastError = geminiError;
-        
-        const errorMessage = geminiError.message || '';
-        
-        // Check if it's a quota error
-        if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
-          quotaErrors++;
-          markClientFailed(geminiClient, geminiError);
+          const messageWithContext = contextPrompt + '\n\nUser: ' + message;
           
-          // If all keys hit quota, fail fast
-          if (quotaErrors >= maxAttempts) {
-            console.error('❌ All attempted keys hit quota. Failing fast.');
-            break;
+          console.log('📤 Sending message to Gemma model...');
+          const startTime = Date.now();
+          
+          aiResponse = await callGeminiAPI(model, messageWithContext, chatHistory);
+          
+          const responseTime = Date.now() - startTime;
+          console.log(`✅ Received response from key ${geminiClient.index + 1} model ${modelToUse} in ${responseTime}ms`);
+          
+          // Cache response
+          if (!detectRiskKeywords(message)) {
+            responseCache.set(cacheKey, {
+              response: aiResponse,
+              timestamp: Date.now()
+            });
+            // Clean old cache entries (keep cache under 100 entries)
+            if (responseCache.size > 100) {
+              const oldestKey = responseCache.keys().next().value;
+              responseCache.delete(oldestKey);
+            }
           }
-        } else {
-          // For non-quota errors, mark as failed but continue
-          markClientFailed(geminiClient, geminiError);
+          
+          // Success! Return response
+          modelSuccess = true;
+          return res.json({
+            message: aiResponse,
+            isEmergency: false
+          });
+          
+        } catch (modelError) {
+          console.error(`❌ Model ${modelToUse} error with key ${geminiClient.index + 1}:`, modelError.message);
+          lastError = modelError;
+          
+          const errorMessage = modelError.message || '';
+          
+          // Mark this model as failed
+          markModelFailed(geminiClient, modelToUse);
+          
+          // Check if it's a quota error for this model
+          if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+            // This model hit quota, try next model
+            console.log(`⚠️ Model ${modelToUse} hit quota. Trying next Gemma model...`);
+            continue; // Try next model
+          } else {
+            // For other errors (timeout, etc.), try next model quickly
+            console.log(`⚠️ Model ${modelToUse} failed. Trying next Gemma model...`);
+            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+            continue; // Try next model
+          }
+        }
+      }
+      
+      // All models for this key failed
+      if (!modelSuccess) {
+        console.warn(`⚠️ All Gemma models exhausted for key ${geminiClient.index + 1}. Moving to next API key...`);
+        quotaErrors++;
+        markClientFailed(geminiClient, lastError);
+        
+        // If all keys exhausted, fail fast
+        if (quotaErrors >= maxKeyAttempts) {
+          console.error('❌ All attempted keys and models exhausted. Failing fast.');
+          break;
         }
         
-        // Try next key if available (but don't wait long)
-        if (attempt < maxAttempts - 1) {
-          console.log(`⚠️ Trying next available key...`);
-          // Small delay to avoid hammering keys
+        // Try next key
+        if (keyAttempt < maxKeyAttempts - 1) {
           await new Promise(resolve => setTimeout(resolve, 100));
           continue;
         }
