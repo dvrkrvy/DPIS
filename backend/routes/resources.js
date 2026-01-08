@@ -42,7 +42,11 @@ router.get('/', authenticate, async (req, res) => {
         [userId]
       );
 
+      console.log(`🔍 Personalization check - User ${userId}, Test results: ${testResults.rows.length}`);
+
       if (testResults.rows.length > 0) {
+        console.log(`📊 Test results found:`, testResults.rows.map(r => `${r.test_type}:${r.severity}`));
+        
         // Build conditions to match resources to test results
         // Match if resource's test_type and severity match any of user's test results
         const conditions = [];
@@ -59,6 +63,7 @@ router.get('/', authenticate, async (req, res) => {
 
         if (conditions.length > 0) {
           query += ` AND (${conditions.join(' OR ')})`;
+          console.log(`✅ Added personalization filter for ${conditions.length} test result(s)`);
         }
 
         // Order by priority if column exists, otherwise just by created date
@@ -69,6 +74,7 @@ router.get('/', authenticate, async (req, res) => {
         }
       } else {
         // No test results yet - return general resources (those without test-specific targeting)
+        console.log(`⚠️ No test results found for user ${userId}, returning general resources`);
         if (hasPersonalizationColumns) {
           query += ' AND (test_types IS NULL OR array_length(test_types, 1) IS NULL)';
           query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC';
@@ -107,6 +113,8 @@ router.get('/', authenticate, async (req, res) => {
 
     const result = await pool.query(query, params);
     
+    console.log(`📦 Found ${result.rows.length} resources for user ${userId} (personalized: ${personalized === 'true' && hasPersonalizationColumns})`);
+    
     // Get test results count for personalized responses
     let testResultsCount = null;
     if (personalized === 'true' && req.user.role === 'student') {
@@ -118,6 +126,35 @@ router.get('/', authenticate, async (req, res) => {
         testResultsCount = parseInt(countResult.rows[0].count);
       } catch (countError) {
         console.warn('Could not get test results count:', countError.message);
+      }
+    }
+    
+    // If personalized but no resources found, check if resources exist with personalization data
+    if (personalized === 'true' && hasPersonalizationColumns && result.rows.length === 0) {
+      const testResults = await pool.query(
+        `SELECT test_type, severity 
+         FROM screening_results 
+         WHERE user_id = $1 
+         ORDER BY created_at DESC 
+         LIMIT 3`,
+        [userId]
+      );
+      
+      if (testResults.rows.length > 0) {
+        // Check if any resources exist for these test types/severities
+        const checkQuery = await pool.query(
+          `SELECT COUNT(*) as count FROM resources 
+           WHERE is_active = true 
+           AND test_types IS NOT NULL 
+           AND array_length(test_types, 1) > 0`,
+          []
+        );
+        
+        if (parseInt(checkQuery.rows[0].count) === 0) {
+          console.warn('⚠️ No personalized resources found in database. Run seed script to add resources.');
+        } else {
+          console.warn(`⚠️ No matching resources found for test results: ${testResults.rows.map(r => `${r.test_type}:${r.severity}`).join(', ')}`);
+        }
       }
     }
     
