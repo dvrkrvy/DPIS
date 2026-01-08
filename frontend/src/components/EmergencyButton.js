@@ -4,7 +4,6 @@ import api from '../api/axios';
 
 const EmergencyButton = () => {
   const { isAuthenticated, token } = useAuth();
-  const navigate = useNavigate();
   const [showContacts, setShowContacts] = useState(false);
   const [contacts, setContacts] = useState(null);
 
@@ -34,7 +33,8 @@ const EmergencyButton = () => {
         <>
           <button
             onClick={fetchContacts}
-            className="fixed bottom-6 right-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-50 flex items-center gap-2"
+            className="fixed bottom-6 right-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-50 flex items-center justify-center gap-2"
+            style={{ width: '160px' }}
           >
             <span>🆘</span>
             <span>Emergency</span>
