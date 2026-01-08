@@ -4,10 +4,29 @@ const pool = require('../config/database');
 const { authenticate, requireStudent } = require('../middleware/auth');
 const router = express.Router();
 
-// Initialize OpenAI (can be swapped for Gemini)
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-}) : null;
+// Initialize AI providers
+// Try to use Gemini first if available, otherwise fall back to OpenAI
+let gemini = null;
+let openai = null;
+
+// Initialize Gemini if API key is available
+if (process.env.GEMINI_API_KEY) {
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    console.log('✅ Gemini AI initialized');
+  } catch (error) {
+    console.warn('⚠️ Gemini package not installed. Install with: npm install @google/generative-ai');
+  }
+}
+
+// Initialize OpenAI if API key is available
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+  console.log('✅ OpenAI initialized');
+}
 
 // Risk keywords that trigger emergency protocols
 const RISK_KEYWORDS = [
@@ -61,8 +80,8 @@ These services are available 24/7 and are here to help.`,
       });
     }
 
-    // If no OpenAI API key, return a basic response
-    if (!openai) {
+    // If no AI provider is available, return a basic response
+    if (!gemini && !openai) {
       return res.json({
         message: 'I\'m here to listen and support you. While I\'m not a replacement for professional help, I can help you explore your feelings. Would you like to access our resource hub or speak with a counselor?',
         isEmergency: false
@@ -88,30 +107,39 @@ These services are available 24/7 and are here to help.`,
     }
 
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: contextPrompt
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ],
-        max_tokens: 300,
-        temperature: 0.7
-      });
+      let aiResponse;
 
-      const aiResponse = completion.choices[0].message.content;
+      // Prefer Gemini if available, otherwise use OpenAI
+      if (gemini) {
+        const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
+        const fullPrompt = `${contextPrompt}\n\nUser message: ${message}`;
+        const result = await model.generateContent(fullPrompt);
+        aiResponse = result.response.text();
+      } else if (openai) {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: contextPrompt
+            },
+            {
+              role: 'user',
+              content: message
+            }
+          ],
+          max_tokens: 300,
+          temperature: 0.7
+        });
+        aiResponse = completion.choices[0].message.content;
+      }
 
       res.json({
         message: aiResponse,
         isEmergency: false
       });
-    } catch (openaiError) {
-      console.error('OpenAI API error:', openaiError);
+    } catch (aiError) {
+      console.error('AI API error:', aiError);
       res.json({
         message: 'I\'m here to support you. While I\'m having some technical difficulties, please know that help is available. Would you like to access our resource hub or speak with a counselor?',
         isEmergency: false
