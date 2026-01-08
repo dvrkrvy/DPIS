@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -22,39 +22,23 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
 function AIChatButton() {
+  const location = useLocation();
   const navigate = useNavigate();
+
+  // Hide on public auth pages (onboarding/login)
+  if (location.pathname === '/onboarding' || location.pathname === '/admin/login' || location.pathname === '/') {
+    return null;
+  }
+
+  // Floating AI Chat button - same size as Emergency, slightly above it
   return (
     <button
       onClick={() => navigate('/ai-chat')}
-      style={{ 
-        position: 'fixed',
-        bottom: '140px',
-        right: '24px',
-        zIndex: 99999,
-        background: 'linear-gradient(to right, #2563eb, #9333ea)',
-        color: 'white',
-        fontWeight: 'bold',
-        padding: '12px 24px',
-        borderRadius: '9999px',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        cursor: 'pointer',
-        border: 'none',
-        transition: 'all 0.2s',
-      }}
-      onMouseEnter={(e) => {
-        e.target.style.transform = 'scale(1.05)';
-        e.target.style.background = 'linear-gradient(to right, #1d4ed8, #7e22ce)';
-      }}
-      onMouseLeave={(e) => {
-        e.target.style.transform = 'scale(1)';
-        e.target.style.background = 'linear-gradient(to right, #2563eb, #9333ea)';
-      }}
+      className="fixed bottom-24 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg flex items-center gap-2 transition-all duration-200 hover:scale-105"
+      style={{ zIndex: 60 }}
       title="AI Support Chat"
     >
-      <span style={{ fontSize: '20px' }}>🤖</span>
+      <span className="text-xl">🤖</span>
       <span>AI Chat</span>
     </button>
   );
