@@ -81,7 +81,7 @@ if (process.env.GEMINI_API_KEY) {
     gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
     
-    // Prefer flash model for speed
+    // Prefer flash model for speed (use 1.5-flash, not 2.5-flash)
     geminiModelName = 'gemini-1.5-flash';
     console.log(`✅ Will use model: ${geminiModelName} (optimized for speed)`);
     
@@ -90,9 +90,15 @@ if (process.env.GEMINI_API_KEY) {
       .then((models) => {
         if (models && models.length > 0) {
           console.log('📋 Available Gemini models:', models.join(', '));
-          // Prefer flash if available, otherwise use first available
-          const flashModel = models.find(m => m.includes('flash'));
-          geminiModelName = flashModel || models[0];
+          // Prefer 1.5-flash if available (not 2.5-flash which may not exist)
+          const flashModel = models.find(m => m.includes('1.5-flash') || m.includes('flash'));
+          if (flashModel && !flashModel.includes('2.5')) {
+            geminiModelName = flashModel;
+          } else {
+            // Fallback to first available model that's not 2.5
+            const safeModel = models.find(m => !m.includes('2.5')) || models[0];
+            geminiModelName = safeModel;
+          }
           console.log(`✅ Using optimized model: ${geminiModelName}`);
         }
       })
@@ -123,7 +129,7 @@ const detectRiskKeywords = (text) => {
   return RISK_KEYWORDS.some(keyword => lowerText.includes(keyword));
 };
 
-// Retry function with exponential backoff
+// Retry function with exponential backoff and rate limit handling
 async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 1000) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -131,9 +137,28 @@ async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 1000) {
     } catch (error) {
       if (attempt === maxRetries - 1) throw error;
       
-      const delay = initialDelay * Math.pow(2, attempt);
-      console.log(`⚠️ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      // Check if it's a rate limit error (429)
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+        // Extract retry-after time if available, otherwise use exponential backoff
+        const retryAfterMatch = errorMessage.match(/retry in ([\d.]+)s/i);
+        if (retryAfterMatch) {
+          const retryAfterSeconds = parseFloat(retryAfterMatch[1]);
+          const delay = Math.ceil(retryAfterSeconds * 1000) + 1000; // Add 1 second buffer
+          console.log(`⚠️ Rate limit hit. Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms (${retryAfterSeconds}s)`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          // Use longer delay for quota errors
+          const delay = initialDelay * Math.pow(3, attempt); // More aggressive backoff for quota
+          console.log(`⚠️ Quota/rate limit error. Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } else {
+        // Regular exponential backoff for other errors
+        const delay = initialDelay * Math.pow(2, attempt);
+        console.log(`⚠️ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
   }
 }
@@ -262,7 +287,13 @@ These services are available 24/7 and are here to help.`,
 
     // Use Gemini only
     try {
-      const modelToUse = geminiModelName || 'gemini-1.5-flash';
+      // Ensure we use 1.5-flash, not 2.5-flash (which may not exist or have different limits)
+      let modelToUse = geminiModelName || 'gemini-1.5-flash';
+      // Force 1.5-flash if somehow 2.5 got set
+      if (modelToUse.includes('2.5')) {
+        console.warn('⚠️ Detected 2.5 model, switching to 1.5-flash');
+        modelToUse = 'gemini-1.5-flash';
+      }
       const model = gemini.getGenerativeModel({ model: modelToUse });
       
       // Build conversation history (limit to last 4 messages for speed)
@@ -324,8 +355,15 @@ These services are available 24/7 and are here to help.`,
       // Check for specific error types
       if (errorMessage.includes('timeout')) {
         userMessage += 'The request took too long. Please try again with a shorter message.';
-      } else if (errorMessage.includes('quota') || errorMessage.includes('429')) {
-        userMessage += 'The service is currently busy. Please wait a moment and try again.';
+      } else if (errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+        // Extract retry time if available
+        const retryAfterMatch = errorMessage.match(/retry in ([\d.]+)s/i);
+        if (retryAfterMatch) {
+          const retrySeconds = Math.ceil(parseFloat(retryAfterMatch[1]));
+          userMessage += `The service has reached its usage limit. Please wait about ${retrySeconds} seconds and try again.`;
+        } else {
+          userMessage += 'The service has reached its usage limit for now. Please wait a few minutes and try again.';
+        }
       } else if (errorMessage.includes('403') || errorMessage.includes('401')) {
         userMessage += 'There\'s an authentication issue. Please contact support.';
       } else {
