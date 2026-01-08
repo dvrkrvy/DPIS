@@ -142,23 +142,22 @@ These services are available 24/7 and are here to help.`,
       });
     }
 
-    // Get user's latest screening results for context
-    const screeningResult = await pool.query(
-      `SELECT test_type, score, severity FROM screening_results 
-       WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [userId]
-    );
-
+    // Build context prompt (do database query in parallel if needed)
     let contextPrompt = 'You are a supportive, empathetic AI assistant for a mental health platform. ';
     contextPrompt += 'You provide psychological first aid and emotional support. ';
     contextPrompt += 'You are NOT a medical professional and should not provide diagnoses or medical advice. ';
     contextPrompt += 'If users express serious concerns, encourage them to seek professional help. ';
     contextPrompt += 'Keep responses brief, warm, and supportive. ';
 
-    if (screeningResult.rows.length > 0) {
-      const latest = screeningResult.rows[0];
-      contextPrompt += `The user recently completed a ${latest.test_type} screening with a ${latest.severity} severity score (${latest.score}). `;
-    }
+    // Get screening results asynchronously (don't block on this)
+    const screeningPromise = pool.query(
+      `SELECT test_type, score, severity FROM screening_results 
+       WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    ).catch(err => {
+      console.warn('Screening query error (non-blocking):', err.message);
+      return { rows: [] };
+    });
 
     try {
       let aiResponse;
@@ -168,7 +167,7 @@ These services are available 24/7 and are here to help.`,
         try {
           console.log('🤖 Attempting to use Gemini API...');
           
-          // If we don't have a working model yet, try to list available models now
+          // If we don't have a working model yet, try to find one
           if (!geminiModelName) {
             try {
               const availableModels = await listAvailableGeminiModels(process.env.GEMINI_API_KEY);
@@ -178,69 +177,59 @@ These services are available 24/7 and are here to help.`,
               }
             } catch (listError) {
               console.warn('⚠️ Could not list models:', listError.message);
+              // Try a default model
+              geminiModelName = 'gemini-1.5-flash';
             }
           }
           
-          // Try multiple model names in order of preference until one works
-          const modelNames = geminiModelName 
-            ? [geminiModelName, 'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-pro']
-            : ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-pro'];
+          // Use the stored working model (or try to find one)
+          const modelToUse = geminiModelName || 'gemini-1.5-flash';
+          console.log(`🤖 Using Gemini model: ${modelToUse}`);
           
-          let model = null;
-          let workingModelName = null;
+          const model = gemini.getGenerativeModel({ model: modelToUse });
           
-          // Try each model by actually making an API call
-          for (const modelName of modelNames) {
-            try {
-              console.log(`🔄 Trying model: ${modelName}...`);
-              model = gemini.getGenerativeModel({ model: modelName });
-              
-              // Build conversation history for Gemini
-              const chatHistory = [];
-              
-              // Add conversation history if provided (exclude the initial greeting)
-              if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 1) {
-                // Skip the first message (greeting) and get last 8 messages (4 exchanges)
-                const recentHistory = conversationHistory.slice(1, -1).slice(-8);
-                for (const msg of recentHistory) {
-                  if (msg.role === 'user' || msg.role === 'assistant') {
-                    chatHistory.push({
-                      role: msg.role === 'user' ? 'user' : 'model',
-                      parts: [{ text: msg.content }]
-                    });
-                  }
-                }
+          // Build conversation history for Gemini (limit to last 4 exchanges for speed)
+          const chatHistory = [];
+          
+          if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 1) {
+            // Get last 6 messages (3 exchanges) instead of 8 for better performance
+            const recentHistory = conversationHistory.slice(1, -1).slice(-6);
+            for (const msg of recentHistory) {
+              if (msg.role === 'user' || msg.role === 'assistant') {
+                chatHistory.push({
+                  role: msg.role === 'user' ? 'user' : 'model',
+                  parts: [{ text: msg.content }]
+                });
               }
-              
-              // Start chat session with history
-              const chat = chatHistory.length > 0 
-                ? model.startChat({ history: chatHistory })
-                : model.startChat();
-              
-              console.log('📤 Sending message to Gemini...');
-              // Actually test the API call - this is where it will fail if model doesn't work
-              const result = await chat.sendMessage(message);
-              aiResponse = result.response.text();
-              workingModelName = modelName;
-              
-              // Store the working model name for future requests
-              if (!geminiModelName || geminiModelName !== modelName) {
-                geminiModelName = modelName;
-                console.log(`✅ Found and stored working model: ${modelName}`);
-              }
-              
-              console.log('✅ Received response from Gemini, length:', aiResponse?.length || 0);
-              break; // Success! Exit the loop
-              
-            } catch (modelError) {
-              console.log(`❌ Model ${modelName} failed: ${modelError.message.split('\n')[0]}`);
-              // Continue to next model
-              continue;
             }
           }
           
-          if (!workingModelName) {
-            throw new Error('No available Gemini model found. Tried: ' + modelNames.join(', '));
+          // Add screening context if available (don't wait for it)
+          const screeningResult = await screeningPromise;
+          if (screeningResult.rows.length > 0) {
+            const latest = screeningResult.rows[0];
+            contextPrompt += `The user recently completed a ${latest.test_type} screening with a ${latest.severity} severity score (${latest.score}). `;
+          }
+          
+          // Start chat session with history
+          const chat = chatHistory.length > 0 
+            ? model.startChat({ history: chatHistory })
+            : model.startChat();
+          
+          // Include context in the message
+          const messageWithContext = contextPrompt + '\n\nUser: ' + message;
+          
+          console.log('📤 Sending message to Gemini...');
+          const startTime = Date.now();
+          const result = await chat.sendMessage(messageWithContext);
+          const responseTime = Date.now() - startTime;
+          aiResponse = result.response.text();
+          
+          console.log(`✅ Received response from Gemini in ${responseTime}ms, length:`, aiResponse?.length || 0);
+          
+          // If model worked, store it (in case it wasn't stored before)
+          if (!geminiModelName || geminiModelName !== modelToUse) {
+            geminiModelName = modelToUse;
           }
         } catch (geminiError) {
           console.error('❌ Gemini API error:', geminiError);
