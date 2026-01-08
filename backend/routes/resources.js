@@ -3,37 +3,94 @@ const pool = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 
-// Get all resources (with optional filtering)
+// Get all resources (with optional filtering and personalization)
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { category, contentType, search } = req.query;
+    const { category, contentType, search, personalized } = req.query;
+    const userId = req.user.id;
     
     let query = 'SELECT * FROM resources WHERE is_active = true';
     const params = [];
     let paramCount = 0;
 
-    if (category) {
-      paramCount++;
-      query += ` AND category = $${paramCount}`;
-      params.push(category);
-    }
+    // If personalized is true, filter based on user's last 3 test results
+    if (personalized === 'true' && req.user.role === 'student') {
+      // Get user's last 3 test results
+      const testResults = await pool.query(
+        `SELECT test_type, severity 
+         FROM screening_results 
+         WHERE user_id = $1 
+         ORDER BY created_at DESC 
+         LIMIT 3`,
+        [userId]
+      );
 
-    if (contentType) {
-      paramCount++;
-      query += ` AND content_type = $${paramCount}`;
-      params.push(contentType);
-    }
+      if (testResults.rows.length > 0) {
+        // Build conditions to match resources to test results
+        // Match if resource's test_type and severity match any of user's test results
+        const conditions = [];
+        
+        testResults.rows.forEach((result) => {
+          paramCount++;
+          conditions.push(
+            `($${paramCount}::text = ANY(test_types) AND $${paramCount + 1}::text = ANY(severity_levels))`
+          );
+          params.push(result.test_type);
+          paramCount++;
+          params.push(result.severity);
+        });
 
-    if (search) {
-      paramCount++;
-      query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount} OR $${paramCount} = ANY(tags))`;
-      params.push(`%${search}%`);
-    }
+        if (conditions.length > 0) {
+          query += ` AND (${conditions.join(' OR ')})`;
+        }
 
-    query += ' ORDER BY created_at DESC';
+        // Order by priority (higher priority first), then by created date
+        query += ' ORDER BY priority DESC, created_at DESC LIMIT 50';
+      } else {
+        // No test results yet - return general resources (those without test-specific targeting)
+        query += ' AND (test_types IS NULL OR array_length(test_types, 1) IS NULL)';
+        query += ' ORDER BY priority DESC, created_at DESC';
+      }
+    } else {
+      // Regular filtering without personalization
+      if (category) {
+        paramCount++;
+        query += ` AND category = $${paramCount}`;
+        params.push(category);
+      }
+
+      if (contentType) {
+        paramCount++;
+        query += ` AND content_type = $${paramCount}`;
+        params.push(contentType);
+      }
+
+      if (search) {
+        paramCount++;
+        query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount} OR $${paramCount} = ANY(tags))`;
+        params.push(`%${search}%`);
+      }
+
+      query += ' ORDER BY priority DESC, created_at DESC';
+    }
 
     const result = await pool.query(query, params);
-    res.json({ resources: result.rows });
+    
+    // Get test results count for personalized responses
+    let testResultsCount = null;
+    if (personalized === 'true' && req.user.role === 'student') {
+      const countResult = await pool.query(
+        'SELECT COUNT(*) as count FROM screening_results WHERE user_id = $1', 
+        [userId]
+      );
+      testResultsCount = parseInt(countResult.rows[0].count);
+    }
+    
+    res.json({ 
+      resources: result.rows,
+      personalized: personalized === 'true',
+      testResultsCount: testResultsCount
+    });
   } catch (error) {
     console.error('Get resources error:', error);
     res.status(500).json({ message: 'Failed to fetch resources' });

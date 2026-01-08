@@ -4,12 +4,14 @@ import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const Resources = () => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [resources, setResources] = useState([]);
   const [categories, setCategories] = useState([]);
   const [contentTypes, setContentTypes] = useState([]);
   const [filters, setFilters] = useState({ category: '', contentType: '', search: '' });
   const [loading, setLoading] = useState(true);
+  const [personalized, setPersonalized] = useState(true);
+  const [testResultsCount, setTestResultsCount] = useState(null);
 
   useEffect(() => {
     if (token) {
@@ -17,7 +19,7 @@ const Resources = () => {
       fetchContentTypes();
       fetchResources();
     }
-  }, [filters, token]);
+  }, [filters, token, personalized]);
 
   const fetchCategories = async () => {
     try {
@@ -45,6 +47,12 @@ const Resources = () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      
+      // Add personalization parameter if user is a student
+      if (personalized && user?.role === 'student') {
+        params.append('personalized', 'true');
+      }
+      
       if (filters.category) params.append('category', filters.category);
       if (filters.contentType) params.append('contentType', filters.contentType);
       if (filters.search) params.append('search', filters.search);
@@ -53,6 +61,7 @@ const Resources = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setResources(response.data.resources || []);
+      setTestResultsCount(response.data.testResultsCount);
     } catch (error) {
       console.error('Failed to fetch resources:', error);
       toast.error('Failed to fetch resources');
@@ -86,10 +95,60 @@ const Resources = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600 bg-clip-text text-transparent mb-2">
-          Resource Hub
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">Access mental health resources and support materials</p>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600 bg-clip-text text-transparent mb-2">
+              Resource Hub
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              {personalized && user?.role === 'student' 
+                ? 'Personalized resources based on your recent test results' 
+                : 'Access mental health resources and support materials'}
+            </p>
+          </div>
+          {user?.role === 'student' && (
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-sm text-gray-700 dark:text-gray-300">All Resources</span>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={personalized}
+                    onChange={(e) => setPersonalized(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-14 h-7 rounded-full transition-colors ${
+                    personalized ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}>
+                    <div className={`w-6 h-6 rounded-full bg-white transition-transform mt-0.5 ml-0.5 ${
+                      personalized ? 'translate-x-7' : 'translate-x-0'
+                    }`}></div>
+                  </div>
+                </div>
+                <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Personalized</span>
+              </label>
+            </div>
+          )}
+        </div>
+        {personalized && user?.role === 'student' && testResultsCount !== null && (
+          <div className={`mt-4 p-4 rounded-xl ${
+            testResultsCount > 0 
+              ? 'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800' 
+              : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
+          }`}>
+            {testResultsCount > 0 ? (
+              <p className="text-sm text-primary-800 dark:text-primary-200">
+                ✨ Showing resources tailored to your last {Math.min(testResultsCount, 3)} test result{testResultsCount > 1 ? 's' : ''}. 
+                Take more tests to improve personalization.
+              </p>
+            ) : (
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                📋 You haven't taken any screening tests yet. 
+                <a href="/screening" className="underline font-medium ml-1">Take a test</a> to get personalized resources.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
@@ -195,7 +254,21 @@ const Resources = () => {
 
       {!loading && resources.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">No resources found. Try adjusting your filters.</p>
+          {personalized && user?.role === 'student' && testResultsCount === 0 ? (
+            <div>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                No personalized resources available yet.
+              </p>
+              <a 
+                href="/screening" 
+                className="inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+              >
+                Take a Screening Test
+              </a>
+            </div>
+          ) : (
+            <p className="text-gray-600 dark:text-gray-400">No resources found. Try adjusting your filters.</p>
+          )}
         </div>
       )}
     </div>
