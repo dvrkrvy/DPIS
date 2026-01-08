@@ -33,17 +33,35 @@ const EmergencyButton = () => {
       {/* AI Chat Button - positioned above emergency button */}
       <button
         onClick={() => navigate('/ai-chat')}
-        className="fixed right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl flex items-center gap-2 transition-all duration-200 hover:scale-105"
-        title="AI Support Chat"
         style={{ 
-          bottom: '112px',
-          zIndex: 60,
           position: 'fixed',
-          display: 'block',
-          visibility: 'visible'
+          bottom: '140px',
+          right: '24px',
+          zIndex: 9999,
+          background: 'linear-gradient(to right, #2563eb, #9333ea)',
+          color: 'white',
+          fontWeight: 'bold',
+          padding: '12px 24px',
+          borderRadius: '9999px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: 'pointer',
+          border: 'none',
+          transition: 'all 0.2s',
         }}
+        onMouseEnter={(e) => {
+          e.target.style.transform = 'scale(1.05)';
+          e.target.style.background = 'linear-gradient(to right, #1d4ed8, #7e22ce)';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.transform = 'scale(1)';
+          e.target.style.background = 'linear-gradient(to right, #2563eb, #9333ea)';
+        }}
+        title="AI Support Chat"
       >
-        <span className="text-xl">🤖</span>
+        <span style={{ fontSize: '20px' }}>🤖</span>
         <span>AI Chat</span>
       </button>
 
