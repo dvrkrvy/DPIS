@@ -1,15 +1,41 @@
 const express = require('express');
 const OpenAI = require('openai');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const pool = require('../config/database');
 const { authenticate, requireStudent } = require('../middleware/auth');
 const router = express.Router();
 
+// Rate limiting: 30 requests per 15 minutes per user
+const aiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // 30 requests per window
+  message: 'Too many AI chat requests. Please wait a few minutes before trying again.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for emergency keywords
+    const message = req.body?.message || '';
+    const lowerText = message.toLowerCase();
+    const emergencyKeywords = ['suicide', 'suicidal', 'kill myself', 'end my life', 'want to die'];
+    return emergencyKeywords.some(keyword => lowerText.includes(keyword));
+  }
+});
+
+// Request queue to prevent overwhelming the API
+const requestQueue = [];
+let processingQueue = false;
+const MAX_CONCURRENT_REQUESTS = 3; // Process max 3 requests at once
+let activeRequests = 0;
+
+// Simple response cache for common queries (5 minute TTL)
+const responseCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 // Initialize AI providers
-// Try to use Gemini first if available, otherwise fall back to OpenAI
 let gemini = null;
 let openai = null;
-let geminiModelName = null; // Store the working model name
+let geminiModelName = null;
 
 // Function to list available Gemini models
 async function listAvailableGeminiModels(apiKey) {
@@ -18,10 +44,13 @@ async function listAvailableGeminiModels(apiKey) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
     
     return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Model listing timeout')), 10000);
+      
       https.get(url, (res) => {
         let data = '';
         res.on('data', (chunk) => { data += chunk; });
         res.on('end', () => {
+          clearTimeout(timeout);
           try {
             const response = JSON.parse(data);
             if (response.models) {
@@ -36,14 +65,17 @@ async function listAvailableGeminiModels(apiKey) {
             reject(parseError);
           }
         });
-      }).on('error', reject);
+      }).on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
     });
   } catch (error) {
     throw error;
   }
 }
 
-// Initialize Gemini if API key is available (async initialization)
+// Initialize Gemini if API key is available
 console.log('🔍 Checking for GEMINI_API_KEY...', process.env.GEMINI_API_KEY ? 'Found' : 'Not found');
 if (process.env.GEMINI_API_KEY) {
   try {
@@ -51,20 +83,24 @@ if (process.env.GEMINI_API_KEY) {
     gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     console.log('✅ Gemini AI initialized with key:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
     
-    // List available models from the API
+    // Prefer flash model for speed
+    geminiModelName = 'gemini-1.5-flash';
+    console.log(`✅ Will use model: ${geminiModelName} (optimized for speed)`);
+    
+    // Verify model availability in background
     listAvailableGeminiModels(process.env.GEMINI_API_KEY)
       .then((models) => {
         if (models && models.length > 0) {
           console.log('📋 Available Gemini models:', models.join(', '));
-          geminiModelName = models[0]; // Use first available model
-          console.log(`✅ Will use model: ${geminiModelName}`);
-        } else {
-          console.warn('⚠️ No models found in API response. Will try defaults during first call.');
+          // Prefer flash if available, otherwise use first available
+          const flashModel = models.find(m => m.includes('flash'));
+          geminiModelName = flashModel || models[0];
+          console.log(`✅ Using optimized model: ${geminiModelName}`);
         }
       })
       .catch((listError) => {
         console.warn('⚠️ Could not list available models:', listError.message);
-        console.warn('⚠️ Will try default models during first API call');
+        console.warn('⚠️ Will use default model: gemini-1.5-flash');
       });
   } catch (error) {
     console.error('❌ Gemini initialization error:', error.message);
@@ -77,7 +113,9 @@ if (process.env.GEMINI_API_KEY) {
 // Initialize OpenAI if API key is available
 if (process.env.OPENAI_API_KEY) {
   openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: 30000, // 30 second timeout
+    maxRetries: 2
   });
   console.log('✅ OpenAI initialized');
 }
@@ -95,8 +133,68 @@ const detectRiskKeywords = (text) => {
   return RISK_KEYWORDS.some(keyword => lowerText.includes(keyword));
 };
 
-// AI Chat endpoint
-router.post('/chat', authenticate, requireStudent, async (req, res) => {
+// Retry function with exponential backoff
+async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 1000) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error;
+      
+      const delay = initialDelay * Math.pow(2, attempt);
+      console.log(`⚠️ Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+// Call Gemini API with timeout and retry
+async function callGeminiAPI(model, messageWithContext, chatHistory, timeoutMs = 25000) {
+  return Promise.race([
+    retryWithBackoff(async () => {
+      const chat = chatHistory.length > 0 
+        ? model.startChat({ history: chatHistory })
+        : model.startChat();
+      
+      const result = await chat.sendMessage(messageWithContext, {
+        generationConfig: {
+          maxOutputTokens: 500, // Limit response length for speed
+          temperature: 0.7,
+        }
+      });
+      
+      return result.response.text();
+    }, 2), // 2 retries
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Gemini API timeout')), timeoutMs)
+    )
+  ]);
+}
+
+// Process queue
+async function processQueue() {
+  if (processingQueue || requestQueue.length === 0 || activeRequests >= MAX_CONCURRENT_REQUESTS) {
+    return;
+  }
+  
+  processingQueue = true;
+  
+  while (requestQueue.length > 0 && activeRequests < MAX_CONCURRENT_REQUESTS) {
+    const { req, res, next } = requestQueue.shift();
+    activeRequests++;
+    
+    // Process request asynchronously
+    handleAIRequest(req, res, next).finally(() => {
+      activeRequests--;
+      processQueue(); // Process next in queue
+    });
+  }
+  
+  processingQueue = false;
+}
+
+// Main AI request handler
+async function handleAIRequest(req, res, next) {
   try {
     const { message, conversationHistory } = req.body;
     const userId = req.user.id;
@@ -105,18 +203,29 @@ router.post('/chat', authenticate, requireStudent, async (req, res) => {
       return res.status(400).json({ message: 'Message is required' });
     }
 
+    // Check cache first (for non-emergency queries)
+    const cacheKey = message.toLowerCase().trim().substring(0, 100);
+    if (!detectRiskKeywords(message)) {
+      const cached = responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        console.log('💾 Serving from cache');
+        return res.json({
+          message: cached.response,
+          isEmergency: false
+        });
+      }
+    }
+
     // Check for risk keywords
     const hasRiskKeywords = detectRiskKeywords(message);
 
     if (hasRiskKeywords) {
-      // Create emergency flag
       await pool.query(
         `INSERT INTO emergency_flags (user_id, flag_type, severity, context)
          VALUES ($1, $2, $3, $4)`,
         [userId, 'ai_keyword', 'critical', `Risk keywords detected in AI chat: ${message.substring(0, 200)}`]
       );
 
-      // Return emergency response
       return res.json({
         message: `I'm concerned about what you've shared. Your safety is important. Please reach out to:
 
@@ -142,14 +251,14 @@ These services are available 24/7 and are here to help.`,
       });
     }
 
-    // Build context prompt (do database query in parallel if needed)
+    // Build context prompt
     let contextPrompt = 'You are a supportive, empathetic AI assistant for a mental health platform. ';
     contextPrompt += 'You provide psychological first aid and emotional support. ';
     contextPrompt += 'You are NOT a medical professional and should not provide diagnoses or medical advice. ';
     contextPrompt += 'If users express serious concerns, encourage them to seek professional help. ';
-    contextPrompt += 'Keep responses brief, warm, and supportive. ';
+    contextPrompt += 'Keep responses brief (2-3 sentences), warm, and supportive. ';
 
-    // Get screening results asynchronously (don't block on this)
+    // Get screening results asynchronously
     const screeningPromise = pool.query(
       `SELECT test_type, score, severity FROM screening_results 
        WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
@@ -159,105 +268,79 @@ These services are available 24/7 and are here to help.`,
       return { rows: [] };
     });
 
-    try {
-      let aiResponse;
+    let aiResponse;
 
-      // Prefer Gemini if available, otherwise use OpenAI
-      if (gemini) {
-        try {
-          console.log('🤖 Attempting to use Gemini API...');
-          
-          // If we don't have a working model yet, try to find one
-          if (!geminiModelName) {
-            try {
-              const availableModels = await listAvailableGeminiModels(process.env.GEMINI_API_KEY);
-              if (availableModels && availableModels.length > 0) {
-                geminiModelName = availableModels[0];
-                console.log(`✅ Found available model from API: ${geminiModelName}`);
-              }
-            } catch (listError) {
-              console.warn('⚠️ Could not list models:', listError.message);
-              // Try a default model
-              geminiModelName = 'gemini-1.5-flash';
+    // Prefer Gemini if available, otherwise use OpenAI
+    if (gemini) {
+      try {
+        const modelToUse = geminiModelName || 'gemini-1.5-flash';
+        const model = gemini.getGenerativeModel({ model: modelToUse });
+        
+        // Build conversation history (limit to last 4 messages for speed)
+        const chatHistory = [];
+        if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 1) {
+          const recentHistory = conversationHistory.slice(-4); // Only last 2 exchanges
+          for (const msg of recentHistory) {
+            if (msg.role === 'user' || msg.role === 'assistant') {
+              chatHistory.push({
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: [{ text: msg.content }]
+              });
             }
-          }
-          
-          // Use the stored working model (or try to find one)
-          const modelToUse = geminiModelName || 'gemini-1.5-flash';
-          console.log(`🤖 Using Gemini model: ${modelToUse}`);
-          
-          const model = gemini.getGenerativeModel({ model: modelToUse });
-          
-          // Build conversation history for Gemini (limit to last 4 exchanges for speed)
-          const chatHistory = [];
-          
-          if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 1) {
-            // Get last 6 messages (3 exchanges) instead of 8 for better performance
-            const recentHistory = conversationHistory.slice(1, -1).slice(-6);
-            for (const msg of recentHistory) {
-              if (msg.role === 'user' || msg.role === 'assistant') {
-                chatHistory.push({
-                  role: msg.role === 'user' ? 'user' : 'model',
-                  parts: [{ text: msg.content }]
-                });
-              }
-            }
-          }
-          
-          // Add screening context if available (don't wait for it)
-          const screeningResult = await screeningPromise;
-          if (screeningResult.rows.length > 0) {
-            const latest = screeningResult.rows[0];
-            contextPrompt += `The user recently completed a ${latest.test_type} screening with a ${latest.severity} severity score (${latest.score}). `;
-          }
-          
-          // Start chat session with history
-          const chat = chatHistory.length > 0 
-            ? model.startChat({ history: chatHistory })
-            : model.startChat();
-          
-          // Include context in the message
-          const messageWithContext = contextPrompt + '\n\nUser: ' + message;
-          
-          console.log('📤 Sending message to Gemini...');
-          const startTime = Date.now();
-          const result = await chat.sendMessage(messageWithContext);
-          const responseTime = Date.now() - startTime;
-          aiResponse = result.response.text();
-          
-          console.log(`✅ Received response from Gemini in ${responseTime}ms, length:`, aiResponse?.length || 0);
-          
-          // If model worked, store it (in case it wasn't stored before)
-          if (!geminiModelName || geminiModelName !== modelToUse) {
-            geminiModelName = modelToUse;
-          }
-        } catch (geminiError) {
-          console.error('❌ Gemini API error:', geminiError);
-          console.error('❌ Gemini API error details:', JSON.stringify(geminiError, null, 2));
-          // Fall back to OpenAI if available, otherwise return error message
-          if (openai) {
-            console.log('⚠️ Falling back to OpenAI due to Gemini error');
-          } else {
-            // Return a helpful error message instead of crashing
-            return res.json({
-              message: 'I\'m experiencing some technical difficulties with the AI service. Please try again in a moment, or contact support if the issue persists.',
-              isEmergency: false
-            });
           }
         }
-      } else if (openai) {
-        // Build messages array with conversation history
-        const messages = [
-          {
-            role: 'system',
-            content: contextPrompt
+        
+        // Add screening context if available
+        const screeningResult = await screeningPromise;
+        if (screeningResult.rows.length > 0) {
+          const latest = screeningResult.rows[0];
+          contextPrompt += `The user recently completed a ${latest.test_type} screening with a ${latest.severity} severity score (${latest.score}). `;
+        }
+        
+        const messageWithContext = contextPrompt + '\n\nUser: ' + message;
+        
+        console.log('📤 Sending message to Gemini...');
+        const startTime = Date.now();
+        
+        aiResponse = await callGeminiAPI(model, messageWithContext, chatHistory);
+        
+        const responseTime = Date.now() - startTime;
+        console.log(`✅ Received response from Gemini in ${responseTime}ms`);
+        
+        // Cache response
+        if (!detectRiskKeywords(message)) {
+          responseCache.set(cacheKey, {
+            response: aiResponse,
+            timestamp: Date.now()
+          });
+          // Clean old cache entries (keep cache under 100 entries)
+          if (responseCache.size > 100) {
+            const oldestKey = responseCache.keys().next().value;
+            responseCache.delete(oldestKey);
           }
-        ];
-
-        // Add conversation history if provided
+        }
+      } catch (geminiError) {
+        console.error('❌ Gemini API error:', geminiError.message);
+        
+        // Fall back to OpenAI if available
+        if (openai) {
+          console.log('⚠️ Falling back to OpenAI due to Gemini error');
+        } else {
+          return res.json({
+            message: 'I\'m experiencing some technical difficulties with the AI service. Please try again in a moment, or contact support if the issue persists.',
+            isEmergency: false
+          });
+        }
+      }
+    }
+    
+    // Use OpenAI if Gemini failed or isn't available
+    if (!aiResponse && openai) {
+      try {
+        const messages = [{ role: 'system', content: contextPrompt }];
+        
         if (conversationHistory && Array.isArray(conversationHistory)) {
-          // Add last 10 messages for context (5 exchanges)
-          const recentHistory = conversationHistory.slice(-10);
+          const recentHistory = conversationHistory.slice(-6); // Last 3 exchanges
           for (const msg of recentHistory) {
             if (msg.role === 'user' || msg.role === 'assistant') {
               messages.push({
@@ -267,36 +350,56 @@ These services are available 24/7 and are here to help.`,
             }
           }
         }
-
-        // Add current message
-        messages.push({
-          role: 'user',
-          content: message
-        });
-
+        
+        messages.push({ role: 'user', content: message });
+        
         const completion = await openai.chat.completions.create({
           model: 'gpt-3.5-turbo',
           messages: messages,
           max_tokens: 300,
-          temperature: 0.7
+          temperature: 0.7,
+          timeout: 25000
         });
+        
         aiResponse = completion.choices[0].message.content;
+      } catch (openaiError) {
+        console.error('❌ OpenAI API error:', openaiError.message);
+        return res.json({
+          message: 'I\'m here to support you. While I\'m having some technical difficulties, please know that help is available. Would you like to access our resource hub or speak with a counselor?',
+          isEmergency: false
+        });
       }
+    }
 
+    if (aiResponse) {
       res.json({
         message: aiResponse,
         isEmergency: false
       });
-    } catch (aiError) {
-      console.error('AI API error:', aiError);
+    } else {
       res.json({
-        message: 'I\'m here to support you. While I\'m having some technical difficulties, please know that help is available. Would you like to access our resource hub or speak with a counselor?',
+        message: 'I\'m experiencing some technical difficulties. Please try again in a moment.',
         isEmergency: false
       });
     }
   } catch (error) {
     console.error('AI chat error:', error);
     res.status(500).json({ message: 'Failed to process chat message' });
+  }
+}
+
+// AI Chat endpoint with rate limiting and queue
+router.post('/chat', authenticate, requireStudent, aiRateLimiter, (req, res, next) => {
+  // Add to queue if too many concurrent requests
+  if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
+    requestQueue.push({ req, res, next });
+    console.log(`📋 Request queued. Queue length: ${requestQueue.length}`);
+  } else {
+    activeRequests++;
+    handleAIRequest(req, res, next).finally(() => {
+      activeRequests--;
+      processQueue();
+    });
   }
 });
 
