@@ -44,7 +44,7 @@ const detectRiskKeywords = (text) => {
 // AI Chat endpoint
 router.post('/chat', authenticate, requireStudent, async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, conversationHistory } = req.body;
     const userId = req.user.id;
 
     if (!message || typeof message !== 'string') {
@@ -112,22 +112,56 @@ These services are available 24/7 and are here to help.`,
       // Prefer Gemini if available, otherwise use OpenAI
       if (gemini) {
         const model = gemini.getGenerativeModel({ model: 'gemini-pro' });
-        const fullPrompt = `${contextPrompt}\n\nUser message: ${message}`;
+        
+        // Build conversation history for Gemini
+        let fullPrompt = contextPrompt + '\n\n';
+        if (conversationHistory && Array.isArray(conversationHistory) && conversationHistory.length > 0) {
+          // Add recent conversation history (last 5 exchanges)
+          const recentHistory = conversationHistory.slice(-10);
+          for (const msg of recentHistory) {
+            if (msg.role === 'user') {
+              fullPrompt += `User: ${msg.content}\n`;
+            } else if (msg.role === 'assistant') {
+              fullPrompt += `Assistant: ${msg.content}\n`;
+            }
+          }
+        }
+        fullPrompt += `\nUser: ${message}\nAssistant:`;
+        
         const result = await model.generateContent(fullPrompt);
         aiResponse = result.response.text();
       } else if (openai) {
+        // Build messages array with conversation history
+        const messages = [
+          {
+            role: 'system',
+            content: contextPrompt
+          }
+        ];
+
+        // Add conversation history if provided
+        if (conversationHistory && Array.isArray(conversationHistory)) {
+          // Add last 10 messages for context (5 exchanges)
+          const recentHistory = conversationHistory.slice(-10);
+          for (const msg of recentHistory) {
+            if (msg.role === 'user' || msg.role === 'assistant') {
+              messages.push({
+                role: msg.role,
+                content: msg.content
+              });
+            }
+          }
+        }
+
+        // Add current message
+        messages.push({
+          role: 'user',
+          content: message
+        });
+
         const completion = await openai.chat.completions.create({
           model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: contextPrompt
-            },
-            {
-              role: 'user',
-              content: message
-            }
-          ],
+          messages: messages,
           max_tokens: 300,
           temperature: 0.7
         });

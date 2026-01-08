@@ -40,9 +40,18 @@ const AIChatButton = () => {
     setLoading(true);
 
     try {
+      // Send conversation history for context
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
       const response = await api.post(
         '/api/ai/chat',
-        { message: userMessage },
+        { 
+          message: userMessage,
+          conversationHistory: conversationHistory
+        },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -78,14 +87,22 @@ const AIChatButton = () => {
     setIsOpen(true);
   };
 
-  if (!isAuthenticated) return null;
+  // Debug: Log authentication status
+  useEffect(() => {
+    console.log('AIChatButton - isAuthenticated:', isAuthenticated);
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated) {
+    console.log('AIChatButton - Not authenticated, not rendering');
+    return null;
+  }
 
   return (
     <>
       {/* Floating AI Chat Button - positioned above emergency button */}
       <button
         onClick={handleOpen}
-        className="fixed bottom-24 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-50 flex items-center gap-2 transition-all duration-200 hover:scale-105"
+        className="fixed bottom-28 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-2xl z-[60] flex items-center gap-2 transition-all duration-200 hover:scale-105"
         title="AI Support Chat"
       >
         <span className="text-xl">🤖</span>
