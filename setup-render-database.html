@@ -71,18 +71,41 @@
         <p>This tool will migrate and seed your Render database with personalized resources.</p>
         
         <div class="step">
-            <h3>Step 1: Enter your Render Backend URL and Admin Credentials</h3>
+            <h3>Step 1: Enter your Render Backend URL</h3>
             <p>
                 <label>Backend URL:</label><br>
                 <input type="text" id="backendUrl" placeholder="https://your-backend.onrender.com" value="https://dpis-backend.onrender.com">
             </p>
+        </div>
+
+        <div class="step">
+            <h3>Step 1.5: Create Admin Account (if it doesn't exist)</h3>
+            <p>If you don't have an admin account yet, you need to create it first using one of these methods:</p>
+            <p><strong>Option A: Use Render Database Console</strong></p>
+            <ol>
+                <li>Go to your Render dashboard</li>
+                <li>Find your PostgreSQL database</li>
+                <li>Click "Connect" or "Query"</li>
+                <li>Run this SQL:</li>
+            </ol>
+            <pre style="background: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto;">
+INSERT INTO admins (email, password_hash, name, institution, is_active)
+VALUES ('admin@dpis.edu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'System Admin', 'DPIS Institution', true)
+ON CONFLICT (email) DO NOTHING;</pre>
+            <p><strong>Option B: Run script locally (if you have DATABASE_URL)</strong></p>
+            <pre style="background: #f0f0f0; padding: 10px; border-radius: 5px;">cd backend
+node scripts/create-admin-account.js</pre>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Enter Admin Credentials</h3>
             <p>
                 <label>Admin Email:</label><br>
                 <input type="email" id="adminEmail" placeholder="admin@dpis.edu" value="admin@dpis.edu">
             </p>
             <p>
                 <label>Admin Password:</label><br>
-                <input type="password" id="adminPassword" placeholder="admin123">
+                <input type="password" id="adminPassword" placeholder="admin123" value="admin123">
             </p>
         </div>
 
