@@ -146,18 +146,21 @@ const Resources = () => {
   const getYouTubeEmbedUrl = (url) => {
     if (!url) return null;
     
-    // If already an embed URL, return as-is
-    if (url.includes('/embed/')) {
-      return url.split('?')[0]; // Remove query params
-    }
-    
     // Try to extract video ID from various YouTube URL formats
     let videoId = null;
     
+    // Format: https://www.youtube.com/embed/VIDEO_ID
+    const embedMatch = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+    if (embedMatch) {
+      videoId = embedMatch[1];
+    }
+    
     // Format: https://www.youtube.com/watch?v=VIDEO_ID
-    const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-    if (watchMatch) {
-      videoId = watchMatch[1];
+    if (!videoId) {
+      const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+      if (watchMatch) {
+        videoId = watchMatch[1];
+      }
     }
     
     // Format: https://youtu.be/VIDEO_ID
@@ -176,17 +179,10 @@ const Resources = () => {
       }
     }
     
-    // Format: https://www.youtube.com/embed/VIDEO_ID
-    if (!videoId) {
-      const embedMatch = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
-      if (embedMatch) {
-        videoId = embedMatch[1];
-      }
-    }
-    
-    // If we found a valid video ID, return embed URL
+    // If we found a valid video ID, return embed URL with proper parameters
     if (videoId) {
-      return `https://www.youtube.com/embed/${videoId}`;
+      // Add parameters to ensure proper embedding: rel=0 (no related videos), modestbranding=1 (minimal YouTube branding)
+      return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&enablejsapi=1`;
     }
     
     // If no video ID found, return null to show fallback
