@@ -295,6 +295,96 @@ router.post('/admin/create-first', async (req, res) => {
   }
 });
 
+// List admin emails (public endpoint for setup purposes)
+router.get('/admin/list', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT email, name, created_at FROM admins WHERE is_active = true ORDER BY created_at'
+    );
+    res.json({
+      success: true,
+      count: result.rows.length,
+      admins: result.rows.map(admin => ({
+        email: admin.email,
+        name: admin.name,
+        created_at: admin.created_at
+      }))
+    });
+  } catch (error) {
+    console.error('List admins error:', error);
+    res.status(500).json({ success: false, message: 'Failed to list admins' });
+  }
+});
+
+// Reset admin password (only works if you know the email and have a setup secret)
+router.post('/admin/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword, setupSecret } = req.body;
+    
+    // Check for setup secret (set this in your Render environment variables)
+    // Default secret for setup - CHANGE THIS IN PRODUCTION
+    const expectedSecret = process.env.ADMIN_SETUP_SECRET || 'dpis-setup-2024';
+    
+    if (!setupSecret || setupSecret !== expectedSecret) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid setup secret. This endpoint requires ADMIN_SETUP_SECRET environment variable.'
+      });
+    }
+    
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and newPassword are required'
+      });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters'
+      });
+    }
+    
+    // Check if admin exists
+    const adminCheck = await pool.query(
+      'SELECT id, email FROM admins WHERE email = $1',
+      [email]
+    );
+    
+    if (adminCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin account not found'
+      });
+    }
+    
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Update password
+    await pool.query(
+      'UPDATE admins SET password_hash = $1 WHERE email = $2',
+      [passwordHash, email]
+    );
+    
+    console.log(`✅ Admin password reset: ${email}`);
+    
+    res.json({
+      success: true,
+      message: 'Password reset successfully',
+      email: email
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Verify token
 router.get('/verify', async (req, res) => {
   try {
