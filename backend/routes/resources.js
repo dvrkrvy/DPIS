@@ -46,13 +46,21 @@ router.get('/', authenticate, async (req, res) => {
     }
     
     console.log(`🔍 Personalization check: personalized=${personalized}, isPersonalized=${isPersonalized}, role=${req.user.role}, hasColumns=${hasPersonalizationColumns}`);
+    console.log(`🔍 Full request details:`, {
+      personalizedParam: personalized,
+      isPersonalized,
+      userRole: req.user.role,
+      hasColumns: hasPersonalizationColumns,
+      userId: userId
+    });
     
-    let query = 'SELECT * FROM resources WHERE is_active = true';
+    let query = '';
     const params = [];
     let paramCount = 0;
 
     // If personalized is true and columns exist, filter based on user's last 3 test results
     if (isPersonalized && req.user.role === 'student' && hasPersonalizationColumns) {
+      query = 'SELECT * FROM resources WHERE is_active = true';
       // Get user's last 3 test results
       const testResults = await pool.query(
         `SELECT test_type, severity 
@@ -67,6 +75,7 @@ router.get('/', authenticate, async (req, res) => {
 
       if (testResults.rows.length > 0) {
         console.log(`📊 Test results found:`, testResults.rows.map(r => `${r.test_type}:${r.severity}`));
+        console.log(`📊 Test results details:`, JSON.stringify(testResults.rows, null, 2));
         
         // First, check if any personalized resources exist in the database
         const personalizedResourcesCheck = await pool.query(`
@@ -78,6 +87,17 @@ router.get('/', authenticate, async (req, res) => {
         `);
         const personalizedCount = parseInt(personalizedResourcesCheck.rows[0].count);
         console.log(`📚 Total personalized resources in DB: ${personalizedCount}`);
+        
+        // Debug: Show sample of what severity levels exist in resources
+        const sampleResources = await pool.query(`
+          SELECT DISTINCT severity_levels 
+          FROM resources 
+          WHERE is_active = true 
+          AND severity_levels IS NOT NULL 
+          AND array_length(severity_levels, 1) > 0
+          LIMIT 5
+        `);
+        console.log(`📋 Sample severity_levels in resources:`, sampleResources.rows.map(r => r.severity_levels));
         
         // Build conditions to match resources to test results
         // Match if resource's test_type and severity match any of user's test results
@@ -142,6 +162,7 @@ router.get('/', authenticate, async (req, res) => {
       } else {
         // No test results yet - return general resources (those without test-specific targeting)
         console.log(`⚠️ No test results found for user ${userId}, returning general resources`);
+        query = 'SELECT * FROM resources WHERE is_active = true';
         if (hasPersonalizationColumns) {
           query += ' AND (test_types IS NULL OR array_length(test_types, 1) IS NULL)';
           query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 20';
@@ -152,6 +173,7 @@ router.get('/', authenticate, async (req, res) => {
       }
     } else {
       // Regular filtering without personalization (or if columns don't exist)
+      query = 'SELECT * FROM resources WHERE is_active = true';
       if (category) {
         paramCount++;
         query += ` AND category = $${paramCount}`;
