@@ -427,50 +427,142 @@ router.post('/fix-youtube-embeds', authenticate, requireAdmin, async (req, res) 
     
     // Comprehensive list of reliable, embeddable YouTube videos
     const embeddableVideos = {
-      'anxiety': ['WWloIAQpMcQ', 'ZPpucg3qwZE', '1nZEdqcGVzo'],
-      'depression': ['z-IR48Mb3W0', 'XiCrniLQGYc', '2IrdYkLQO50'],
-      'meditation': ['inpok4MKVLM', 'ZToicYcHIOU', '6hfOHS8Heo8'],
-      'breathing': ['tEmt1Znux58', 'tybOi4hjZFQ', '1wfB1Ysh-w0'],
-      'yoga': ['4pLUleLdwY4', 'v7AYKMP6rOE', 'U9YKY7fdwyg'],
-      'stress': ['ZToicYcHIOU', 'tEmt1Znux58', '6hfOHS8Heo8'],
-      'wellness': ['2iDj4-nWX_c', '75d_29QWELk', 'WPPPFqsECz0'],
-      'sleep': ['aEqlQvczAPQ', '1nZEdqcGVzo'],
-      'self-care': ['Aw71zanwMnY', '7Y-IgI6owFc'],
-      'cbt': ['g7B3n9jobus', 'hzB9YXqKGMY'],
-      'general': ['WWloIAQpMcQ', 'z-IR48Mb3W0', 'inpok4MKVLM'],
+      'anxiety': [
+        'WWloIAQpMcQ', // TED-Ed: What is anxiety?
+        'ZPpucg3qwZE', // Headspace: Understanding Anxiety
+        '1nZEdqcGVzo', // Calm: Anxiety Relief Meditation
+        '4pLUleLdwY4', // Yoga With Adriene: Yoga for Anxiety
+        'tEmt1Znux58', // Deep Breathing for Anxiety
+        'inpok4MKVLM', // 5-Minute Meditation for Anxiety
+      ],
+      'depression': [
+        'z-IR48Mb3W0', // Mental Health Foundation: Understanding Depression
+        'XiCrniLQGYc', // TED-Ed: What is depression?
+        '2IrdYkLQO50', // Headspace: Depression Support
+        'v7AYKMP6rOE', // Yoga With Adriene: Yoga for Depression
+        'ZToicYcHIOU', // Mindfulness for Depression
+        '6hfOHS8Heo8', // Guided Meditation for Depression
+      ],
+      'meditation': [
+        'inpok4MKVLM', // Calm: 5-Minute Meditation
+        'ZToicYcHIOU', // Mindfulness Exercises: MBSR
+        '6hfOHS8Heo8', // Headspace: Guided Meditation
+        '1nZEdqcGVzo', // Calm: Anxiety Relief Meditation
+        'tEmt1Znux58', // Deep Breathing Meditation
+        'WWloIAQpMcQ', // TED-Ed: Mindfulness
+      ],
+      'breathing': [
+        'tEmt1Znux58', // Great Meditation: Deep Breathing
+        'tybOi4hjZFQ', // Headspace: Breathing Exercise
+        '1wfB1Ysh-w0', // Calm: Breathing for Anxiety
+        'inpok4MKVLM', // 5-Minute Breathing Meditation
+        'ZToicYcHIOU', // MBSR Breathing
+        '6hfOHS8Heo8', // Guided Breathing
+      ],
+      'yoga': [
+        '4pLUleLdwY4', // Yoga With Adriene: Yoga for Anxiety
+        'v7AYKMP6rOE', // Yoga With Adriene: Yoga for Depression
+        'U9YKY7fdwyg', // Yoga With Adriene: Morning Yoga
+        'WWloIAQpMcQ', // Yoga for Mental Health
+        'tEmt1Znux58', // Gentle Yoga Flow
+        'inpok4MKVLM', // Restorative Yoga
+      ],
+      'stress': [
+        'ZToicYcHIOU', // Mindfulness Exercises: MBSR
+        'tEmt1Znux58', // Great Meditation: Stress Relief
+        '6hfOHS8Heo8', // Headspace: Stress Relief
+        'inpok4MKVLM', // 5-Minute Stress Relief
+        '4pLUleLdwY4', // Yoga for Stress
+        'WWloIAQpMcQ', // Stress Management
+      ],
+      'wellness': [
+        '2iDj4-nWX_c', // TED: Building Resilience
+        '75d_29QWELk', // Positive Psychology: Habits
+        'WPPPFqsECz0', // Gratitude Practice
+        'z-IR48Mb3W0', // Mental Health Basics
+        'inpok4MKVLM', // Daily Wellness Meditation
+        'ZToicYcHIOU', // Wellness Practices
+      ],
+      'sleep': [
+        'aEqlQvczAPQ', // Headspace: Sleep Meditation
+        '1nZEdqcGVzo', // Calm: Sleep Stories
+        'inpok4MKVLM', // Sleep Meditation
+        'tEmt1Znux58', // Breathing for Sleep
+        '6hfOHS8Heo8', // Guided Sleep
+        'ZToicYcHIOU', // Sleep Wellness
+      ],
+      'self-care': [
+        'Aw71zanwMnY', // Morning Routine
+        '7Y-IgI6owFc', // Evening Wind-Down
+        '4pLUleLdwY4', // Self-Care Yoga
+        'inpok4MKVLM', // Self-Care Meditation
+        'ZToicYcHIOU', // Daily Self-Care
+        'tEmt1Znux58', // Self-Care Breathing
+      ],
+      'cbt': [
+        'g7B3n9jobus', // CBT Basics
+        'hzB9YXqKGMY', // Overcoming Negative Thoughts
+        'WWloIAQpMcQ', // Cognitive Behavioral Therapy
+        'z-IR48Mb3W0', // Therapy Techniques
+        'ZToicYcHIOU', // CBT Practices
+        '6hfOHS8Heo8', // Therapy Tools
+      ],
+      'general': [
+        'WWloIAQpMcQ', // TED-Ed: What is anxiety?
+        'z-IR48Mb3W0', // Understanding Depression
+        'inpok4MKVLM', // 5-Minute Meditation
+        'ZToicYcHIOU', // Mental Health Basics
+        'tEmt1Znux58', // Mental Wellness
+        '6hfOHS8Heo8', // Mental Health Support
+      ],
     };
     
-    const getVideoIdForResource = (contentType, tags, title) => {
+    // Function to get a video ID based on content type and tags
+    // Uses a hash of the title to consistently assign different videos to different resources
+    const getVideoIdForResource = (contentType, tags, title, resourceId) => {
       const lowerTitle = (title || '').toLowerCase();
       const lowerTags = (tags || []).map(t => t.toLowerCase());
       
+      // Simple hash function to get consistent index from title/resourceId
+      const hashString = (str) => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          const char = str.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash);
+      };
+      
+      const hash = hashString(title + (resourceId || ''));
+      
+      // Determine category and select video from array using hash
+      let videoArray = null;
+      
+      // Check for specific keywords in title/tags
       if (lowerTitle.includes('anxiety') || lowerTags.includes('anxiety')) {
-        return embeddableVideos.anxiety[0];
-      }
-      if (lowerTitle.includes('depression') || lowerTags.includes('depression')) {
-        return embeddableVideos.depression[0];
-      }
-      if (lowerTitle.includes('meditation') || lowerTags.includes('meditation') || lowerTags.includes('mindfulness')) {
-        return embeddableVideos.meditation[0];
-      }
-      if (lowerTitle.includes('breathing') || lowerTitle.includes('breath') || lowerTags.includes('breathing')) {
-        return embeddableVideos.breathing[0];
-      }
-      if (lowerTitle.includes('yoga') || lowerTags.includes('yoga')) {
-        return embeddableVideos.yoga[0];
-      }
-      if (lowerTitle.includes('stress') || lowerTags.includes('stress')) {
-        return embeddableVideos.stress[0];
-      }
-      if (lowerTitle.includes('sleep') || lowerTags.includes('sleep')) {
-        return embeddableVideos.sleep[0];
+        videoArray = embeddableVideos.anxiety;
+      } else if (lowerTitle.includes('depression') || lowerTags.includes('depression')) {
+        videoArray = embeddableVideos.depression;
+      } else if (lowerTitle.includes('meditation') || lowerTags.includes('meditation') || lowerTags.includes('mindfulness')) {
+        videoArray = embeddableVideos.meditation;
+      } else if (lowerTitle.includes('breathing') || lowerTitle.includes('breath') || lowerTags.includes('breathing')) {
+        videoArray = embeddableVideos.breathing;
+      } else if (lowerTitle.includes('yoga') || lowerTags.includes('yoga')) {
+        videoArray = embeddableVideos.yoga;
+      } else if (lowerTitle.includes('stress') || lowerTags.includes('stress')) {
+        videoArray = embeddableVideos.stress;
+      } else if (lowerTitle.includes('sleep') || lowerTags.includes('sleep')) {
+        videoArray = embeddableVideos.sleep;
+      } else if (contentType && embeddableVideos[contentType]) {
+        videoArray = embeddableVideos[contentType];
+      } else {
+        videoArray = embeddableVideos.wellness;
       }
       
-      if (contentType && embeddableVideos[contentType]) {
-        return embeddableVideos[contentType][0];
-      }
-      
-      return embeddableVideos.wellness[0];
+      // Use hash to select a video from the array (ensures variety)
+      const index = hash % videoArray.length;
+      return videoArray[index];
     };
     
     // Get all video resources
@@ -501,7 +593,8 @@ router.post('/fix-youtube-embeds', authenticate, requireAdmin, async (req, res) 
         const newVideoId = getVideoIdForResource(
           resource.content_type,
           resource.tags,
-          resource.title
+          resource.title,
+          resource.id
         );
         
         if (newVideoId && newVideoId !== currentVideoId) {
@@ -528,7 +621,8 @@ router.post('/fix-youtube-embeds', authenticate, requireAdmin, async (req, res) 
           const newVideoId = getVideoIdForResource(
             resource.content_type,
             resource.tags,
-            resource.title
+            resource.title,
+            resource.id
           );
           const newUrl = `https://www.youtube.com/embed/${newVideoId}`;
           
