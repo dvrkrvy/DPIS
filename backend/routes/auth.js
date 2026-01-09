@@ -202,6 +202,99 @@ router.post('/admin/login', [
   }
 });
 
+// One-time admin account creation (only works if no admins exist)
+router.post('/admin/create-first', async (req, res) => {
+  try {
+    const { email, password, name, institution } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email and password are required' 
+      });
+    }
+
+    // Check if any admin accounts exist
+    const existingAdmins = await pool.query('SELECT COUNT(*) as count FROM admins');
+    const adminCount = parseInt(existingAdmins.rows[0].count);
+
+    if (adminCount > 0) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Admin accounts already exist. Use admin login or create account through database.' 
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid email format' 
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Password must be at least 6 characters' 
+      });
+    }
+
+    // Generate password hash
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create admin account
+    const result = await pool.query(
+      `INSERT INTO admins (email, password_hash, name, institution, is_active)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING id, email, name`,
+      [
+        email,
+        passwordHash,
+        name || 'System Admin',
+        institution || 'DPIS Institution'
+      ]
+    );
+
+    console.log(`✅ First admin account created: ${email}`);
+
+    res.json({
+      success: true,
+      message: 'Admin account created successfully',
+      admin: {
+        id: result.rows[0].id,
+        email: result.rows[0].email,
+        name: result.rows[0].name
+      }
+    });
+  } catch (error) {
+    console.error('Create first admin error:', error);
+    
+    if (error.code === '23505') {
+      return res.status(409).json({ 
+        success: false,
+        message: 'An admin account with this email already exists' 
+      });
+    }
+    
+    if (error.code === '42P01') {
+      return res.status(500).json({ 
+        success: false,
+        message: 'Admins table does not exist. Please initialize the database first.' 
+      });
+    }
+
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to create admin account',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Verify token
 router.get('/verify', async (req, res) => {
   try {
