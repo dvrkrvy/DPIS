@@ -144,10 +144,10 @@ router.get('/', authenticate, async (req, res) => {
         console.log(`⚠️ No test results found for user ${userId}, returning general resources`);
         if (hasPersonalizationColumns) {
           query += ' AND (test_types IS NULL OR array_length(test_types, 1) IS NULL)';
-          query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC';
+          query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 20';
         } else {
-          // If columns don't exist, just return all active resources
-          query += ' ORDER BY created_at DESC';
+          // If columns don't exist, just return top 20 active resources
+          query += ' ORDER BY created_at DESC LIMIT 20';
         }
       }
     } else {
@@ -170,11 +170,11 @@ router.get('/', authenticate, async (req, res) => {
         params.push(`%${search}%`);
       }
 
-      // Only use priority if column exists
+      // Only use priority if column exists, limit to 20
       if (hasPersonalizationColumns) {
-        query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC';
+        query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 20';
       } else {
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY created_at DESC LIMIT 20';
       }
     }
 
