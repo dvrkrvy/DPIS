@@ -52,13 +52,16 @@ router.get('/', authenticate, async (req, res) => {
         const conditions = [];
         
         testResults.rows.forEach((result) => {
-          paramCount++;
+          // Get parameter indices before incrementing
+          const testTypeParam = paramCount + 1;
+          const severityParam = paramCount + 2;
+          
           conditions.push(
-            `($${paramCount}::text = ANY(test_types) AND $${paramCount + 1}::text = ANY(severity_levels))`
+            `($${testTypeParam}::text = ANY(test_types) AND $${severityParam}::text = ANY(severity_levels))`
           );
           params.push(result.test_type);
-          paramCount++;
           params.push(result.severity);
+          paramCount += 2; // Increment by 2 since we added 2 parameters
         });
 
         if (conditions.length > 0) {
