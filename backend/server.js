@@ -49,6 +49,9 @@ const io = socketIo(server, {
   }
 });
 
+// Trust proxy (for rate limiting behind proxies like Render, Heroku, etc.)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet());
 

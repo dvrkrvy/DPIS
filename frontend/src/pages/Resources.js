@@ -33,13 +33,20 @@ const Resources = () => {
       if (filters.contentType) params.append('contentType', filters.contentType);
       if (filters.search) params.append('search', filters.search);
 
-      const response = await api.get(`/api/resources?${params}`, {
+      const url = `/api/resources?${params}`;
+      console.log('🔍 Fetching resources with params:', params.toString());
+      console.log('🔍 Full URL:', url);
+      console.log('🔍 Personalized:', personalized, 'User role:', user?.role);
+      
+      const response = await api.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setResources(response.data.resources || []);
       setTestResultsCount(response.data.testResultsCount);
       lastFetchRef.current = Date.now();
       console.log('✅ Resources refreshed, found:', response.data.resources?.length || 0);
+      console.log('✅ Response personalized flag:', response.data.personalized);
+      console.log('✅ Response testResultsCount:', response.data.testResultsCount);
     } catch (error) {
       console.error('Failed to fetch resources:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch resources';

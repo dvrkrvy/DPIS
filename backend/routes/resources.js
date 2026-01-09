@@ -9,6 +9,9 @@ router.get('/', authenticate, async (req, res) => {
     const { category, contentType, search, personalized } = req.query;
     const userId = req.user.id;
     
+    console.log(`📥 Resources request - User: ${userId}, Role: ${req.user.role}, Personalized param: ${personalized}`);
+    console.log(`📥 Query params:`, { category, contentType, search, personalized });
+    
     // First check if personalized columns exist in the database
     // Default to false if check fails - will use backward-compatible queries
     let hasPersonalizationColumns = false;
@@ -20,11 +23,17 @@ router.get('/', authenticate, async (req, res) => {
         AND column_name IN ('test_types', 'severity_levels', 'priority')
       `);
       hasPersonalizationColumns = columnCheck.rows.length === 3;
+      console.log(`📊 Personalization columns check: ${hasPersonalizationColumns ? '✅ EXISTS' : '❌ MISSING'}`);
+      if (hasPersonalizationColumns) {
+        console.log(`   Found columns: ${columnCheck.rows.map(r => r.column_name).join(', ')}`);
+      }
     } catch (colError) {
       // If we can't check columns, assume they don't exist (safe default)
       console.warn('Could not check for personalization columns, using backward-compatible mode:', colError.message);
       hasPersonalizationColumns = false;
     }
+    
+    console.log(`🔍 Personalization check: personalized=${personalized}, role=${req.user.role}, hasColumns=${hasPersonalizationColumns}`);
     
     let query = 'SELECT * FROM resources WHERE is_active = true';
     const params = [];
