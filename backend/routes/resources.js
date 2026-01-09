@@ -47,6 +47,17 @@ router.get('/', authenticate, async (req, res) => {
       if (testResults.rows.length > 0) {
         console.log(`📊 Test results found:`, testResults.rows.map(r => `${r.test_type}:${r.severity}`));
         
+        // First, check if any personalized resources exist in the database
+        const personalizedResourcesCheck = await pool.query(`
+          SELECT COUNT(*) as count 
+          FROM resources 
+          WHERE is_active = true 
+          AND test_types IS NOT NULL 
+          AND array_length(test_types, 1) > 0
+        `);
+        const personalizedCount = parseInt(personalizedResourcesCheck.rows[0].count);
+        console.log(`📚 Total personalized resources in DB: ${personalizedCount}`);
+        
         // Build conditions to match resources to test results
         // Match if resource's test_type and severity match any of user's test results
         const conditions = [];
@@ -67,6 +78,37 @@ router.get('/', authenticate, async (req, res) => {
         if (conditions.length > 0) {
           query += ` AND (${conditions.join(' OR ')})`;
           console.log(`✅ Added personalization filter for ${conditions.length} test result(s)`);
+          console.log(`🔍 Query params:`, params);
+          console.log(`🔍 Full query: ${query}`);
+          
+          // Check if any resources match before executing (use the same conditions)
+          const matchCheckQuery = `SELECT COUNT(*) as count FROM resources WHERE is_active = true AND (${conditions.join(' OR ')})`;
+          const matchCheck = await pool.query(matchCheckQuery, params);
+          console.log(`🎯 Matching resources found: ${matchCheck.rows[0].count}`);
+          
+          // If no exact matches, try matching by test type only (fallback)
+          if (parseInt(matchCheck.rows[0].count) === 0 && personalizedCount > 0) {
+            console.log(`⚠️ No exact matches found, trying fallback: match by test type only`);
+            const fallbackConditions = [];
+            const fallbackParams = [];
+            let fallbackParamCount = 0;
+            
+            // Get unique test types
+            const uniqueTestTypes = [...new Set(testResults.rows.map(r => r.test_type))];
+            uniqueTestTypes.forEach((testType) => {
+              fallbackParamCount++;
+              fallbackConditions.push(`$${fallbackParamCount}::text = ANY(test_types)`);
+              fallbackParams.push(testType);
+            });
+            
+            query = 'SELECT * FROM resources WHERE is_active = true';
+            query += ` AND (${fallbackConditions.join(' OR ')})`;
+            params.length = 0;
+            params.push(...fallbackParams);
+            paramCount = fallbackParams.length;
+            console.log(`🔄 Using fallback query: ${query}`);
+            console.log(`🔄 Fallback params:`, params);
+          }
         }
 
         // Order by priority if column exists, otherwise just by created date
@@ -117,6 +159,10 @@ router.get('/', authenticate, async (req, res) => {
     const result = await pool.query(query, params);
     
     console.log(`📦 Found ${result.rows.length} resources for user ${userId} (personalized: ${personalized === 'true' && hasPersonalizationColumns})`);
+    if (result.rows.length > 0 && personalized === 'true' && hasPersonalizationColumns) {
+      console.log(`📋 Sample resource test_types:`, result.rows[0].test_types);
+      console.log(`📋 Sample resource severity_levels:`, result.rows[0].severity_levels);
+    }
     
     // Get test results count for personalized responses
     let testResultsCount = null;
