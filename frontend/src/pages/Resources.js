@@ -22,8 +22,15 @@ const Resources = () => {
       const params = new URLSearchParams();
       
       // Add personalization parameter if user is a student
-      if (personalized && user?.role === 'student') {
-        params.append('personalized', 'true');
+      // Always send it when personalized toggle is on, even if user object isn't loaded yet
+      if (personalized) {
+        if (user?.role === 'student') {
+          params.append('personalized', 'true');
+        } else if (!user) {
+          // User not loaded yet, but personalized toggle is on - send it anyway
+          // Backend will handle if user role doesn't match
+          params.append('personalized', 'true');
+        }
       }
       
       // Add cache-busting parameter to ensure fresh data

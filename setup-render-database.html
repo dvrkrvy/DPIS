@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Setup Render Database - Personalized Resources</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Setup Personalized Resources on Render</h1>
+        <p>This tool will migrate and seed your Render database with personalized resources.</p>
+        
+        <div class="step">
+            <h3>Step 1: Enter your Render Backend URL and Admin Credentials</h3>
+            <p>
+                <label>Backend URL:</label><br>
+                <input type="text" id="backendUrl" placeholder="https://your-backend.onrender.com" value="https://dpis-backend.onrender.com">
+            </p>
+            <p>
+                <label>Admin Email:</label><br>
+                <input type="email" id="adminEmail" placeholder="admin@dpis.edu" value="admin@dpis.edu">
+            </p>
+            <p>
+                <label>Admin Password:</label><br>
+                <input type="password" id="adminPassword" placeholder="admin123">
+            </p>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Run Migration</h3>
+            <p>This will add the required database columns (test_types, severity_levels, priority).</p>
+            <button id="migrateBtn" onclick="runMigration()">Run Migration</button>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Seed Resources</h3>
+            <p>This will add 120+ personalized resources to your database.</p>
+            <button id="seedBtn" onclick="seedResources()" disabled>Seed Resources</button>
+        </div>
+
+        <div id="log" class="log" style="display:none;"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            logDiv.style.display = 'block';
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            logDiv.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span><br>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function login() {
+            const backendUrl = document.getElementById('backendUrl').value.trim();
+            const email = document.getElementById('adminEmail').value.trim();
+            const password = document.getElementById('adminPassword').value;
+
+            if (!backendUrl || !email || !password) {
+                log('Please fill in all fields', 'error');
+                return false;
+            }
+
+            try {
+                log('Logging in as admin...', 'info');
+                const response = await fetch(`${backendUrl}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    log('✅ Login successful!', 'success');
+                    return true;
+                } else {
+                    log(`❌ Login failed: ${data.message || 'Unknown error'}`, 'error');
+                    return false;
+                }
+            } catch (error) {
+                log(`❌ Login error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function runMigration() {
+            const backendUrl = document.getElementById('backendUrl').value.trim();
+            if (!authToken) {
+                const loggedIn = await login();
+                if (!loggedIn) return;
+            }
+
+            document.getElementById('migrateBtn').disabled = true;
+            log('🔄 Running migration...', 'info');
+
+            try {
+                const response = await fetch(`${backendUrl}/api/admin/setup/migrate-resources`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    log('✅ Migration completed successfully!', 'success');
+                    document.getElementById('seedBtn').disabled = false;
+                } else {
+                    log(`❌ Migration failed: ${data.message || 'Unknown error'}`, 'error');
+                    document.getElementById('migrateBtn').disabled = false;
+                }
+            } catch (error) {
+                log(`❌ Migration error: ${error.message}`, 'error');
+                document.getElementById('migrateBtn').disabled = false;
+            }
+        }
+
+        async function seedResources() {
+            const backendUrl = document.getElementById('backendUrl').value.trim();
+            if (!authToken) {
+                const loggedIn = await login();
+                if (!loggedIn) return;
+            }
+
+            document.getElementById('seedBtn').disabled = true;
+            log('🌱 Seeding resources (this may take a minute)...', 'info');
+
+            try {
+                const response = await fetch(`${backendUrl}/api/admin/setup/seed-resources`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    log(`✅ Seeding completed! Inserted: ${data.inserted || 0}, Updated: ${data.updated || 0}`, 'success');
+                    log('🎉 Setup complete! Restart your Render backend or wait a few minutes for changes to take effect.', 'success');
+                } else {
+                    log(`❌ Seeding failed: ${data.message || 'Unknown error'}`, 'error');
+                    document.getElementById('seedBtn').disabled = false;
+                }
+            } catch (error) {
+                log(`❌ Seeding error: ${error.message}`, 'error');
+                document.getElementById('seedBtn').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
