@@ -98,12 +98,23 @@ app.use(cors({
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
       } else {
-        // In production, allow file:// origins and null origins for setup tools
-        // This allows the HTML setup tool to work from local files and browser console
-        if (origin === 'null' || !origin || origin.startsWith('file://')) {
+        // In production: allow setup tools and Render domains
+        // Allow null/file origins (browser console, local HTML files)
+        if (!origin || origin === 'null' || origin.startsWith('file://')) {
           console.log(`Allowing origin for setup tool: ${origin || 'null'}`);
           callback(null, true);
-        } else {
+        } 
+        // Allow any Render domain (for browser console from Render pages)
+        else if (origin.includes('onrender.com') || origin.includes('render.com')) {
+          console.log(`Allowing Render origin: ${origin}`);
+          callback(null, true);
+        } 
+        // Allow the backend's own domain (same origin requests)
+        else if (origin.includes('dpis-backend.onrender.com')) {
+          console.log(`Allowing same-domain origin: ${origin}`);
+          callback(null, true);
+        }
+        else {
           console.warn(`CORS blocked origin: ${origin}`);
           callback(new Error('Not allowed by CORS'));
         }
