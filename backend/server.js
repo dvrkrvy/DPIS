@@ -98,8 +98,15 @@ app.use(cors({
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
       } else {
-        console.warn(`CORS blocked origin: ${origin}`);
-        callback(new Error('Not allowed by CORS'));
+        // In production, allow file:// origins for setup tools (temporary)
+        // This allows the HTML setup tool to work from local files
+        if (origin === 'null' || origin.startsWith('file://')) {
+          console.log(`Allowing file:// origin for setup tool`);
+          callback(null, true);
+        } else {
+          console.warn(`CORS blocked origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
       }
     }
   },

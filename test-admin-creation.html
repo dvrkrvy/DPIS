@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Admin Creation</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
+        input, button { padding: 10px; margin: 5px; width: 300px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        .result { margin-top: 20px; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Create Admin Account</h1>
+    <p>Backend URL:</p>
+    <input type="text" id="url" value="https://dpis-backend.onrender.com" placeholder="https://your-backend.onrender.com">
+    <p>Email:</p>
+    <input type="email" id="email" value="admin@dpis.edu">
+    <p>Password:</p>
+    <input type="password" id="password" value="admin123">
+    <p>Name:</p>
+    <input type="text" id="name" value="System Admin">
+    <br><br>
+    <button onclick="createAdmin()">Create Admin Account</button>
+    <div id="result"></div>
+
+    <script>
+        async function createAdmin() {
+            const url = document.getElementById('url').value.trim().replace(/\/$/, '');
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const name = document.getElementById('name').value.trim() || 'System Admin';
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Creating...';
+
+            try {
+                const response = await fetch(`${url}/api/auth/admin/create-first`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, name })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `✅ Success! Admin created:<br>Email: ${data.admin.email}<br>ID: ${data.admin.id}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ Error: ${data.message || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Network Error: ${error.message}<br><br>
+                    <strong>If you see CORS error:</strong><br>
+                    1. Open browser console (F12)<br>
+                    2. Copy this command and run it in console:<br>
+                    <code style="background: #f0f0f0; padding: 5px; display: block; margin-top: 10px;">
+                    fetch('${url}/api/auth/admin/create-first', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email: '${email}', password: '${password}', name: '${name}'})}).then(r => r.json()).then(console.log).catch(console.error)
+                    </code>`;
+            }
+        }
+    </script>
+</body>
+</html>
