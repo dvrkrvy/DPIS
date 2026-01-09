@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const Resources = () => {
   const { token, user } = useAuth();
+  const location = useLocation();
   const [resources, setResources] = useState([]);
   const [categories, setCategories] = useState([]);
   const [contentTypes, setContentTypes] = useState([]);
@@ -12,14 +14,81 @@ const Resources = () => {
   const [loading, setLoading] = useState(true);
   const [personalized, setPersonalized] = useState(true);
   const [testResultsCount, setTestResultsCount] = useState(null);
+  const lastFetchRef = useRef(null);
 
+  const fetchResources = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      
+      // Add personalization parameter if user is a student
+      if (personalized && user?.role === 'student') {
+        params.append('personalized', 'true');
+      }
+      
+      // Add cache-busting parameter to ensure fresh data
+      params.append('_t', Date.now());
+      
+      if (filters.category) params.append('category', filters.category);
+      if (filters.contentType) params.append('contentType', filters.contentType);
+      if (filters.search) params.append('search', filters.search);
+
+      const response = await api.get(`/api/resources?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setResources(response.data.resources || []);
+      setTestResultsCount(response.data.testResultsCount);
+      lastFetchRef.current = Date.now();
+      console.log('✅ Resources refreshed, found:', response.data.resources?.length || 0);
+    } catch (error) {
+      console.error('Failed to fetch resources:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch resources';
+      toast.error(errorMessage);
+      setResources([]);
+      
+      // Log more details for debugging
+      if (error.response?.data?.error) {
+        console.error('Detailed error:', error.response.data.error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [personalized, user?.role, filters, token]);
+
+  // Refresh resources when navigating to this page
   useEffect(() => {
     if (token) {
       fetchCategories();
       fetchContentTypes();
       fetchResources();
     }
-  }, [filters, token, personalized]);
+  }, [location.pathname, token, fetchResources]);
+
+  // Refresh when filters or personalized toggle changes
+  useEffect(() => {
+    if (token) {
+      fetchResources();
+    }
+  }, [filters, personalized, token, fetchResources]);
+
+  // Refresh when page becomes visible (user returns from another tab/page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && token && location.pathname === '/resources') {
+        // Only refresh if it's been more than 5 seconds since last fetch
+        const now = Date.now();
+        if (!lastFetchRef.current || (now - lastFetchRef.current) > 5000) {
+          console.log('🔄 Page visible, refreshing resources...');
+          fetchResources();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [token, location.pathname, fetchResources]);
 
   const fetchCategories = async () => {
     try {
@@ -43,39 +112,6 @@ const Resources = () => {
     }
   };
 
-  const fetchResources = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      
-      // Add personalization parameter if user is a student
-      if (personalized && user?.role === 'student') {
-        params.append('personalized', 'true');
-      }
-      
-      if (filters.category) params.append('category', filters.category);
-      if (filters.contentType) params.append('contentType', filters.contentType);
-      if (filters.search) params.append('search', filters.search);
-
-      const response = await api.get(`/api/resources?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setResources(response.data.resources || []);
-      setTestResultsCount(response.data.testResultsCount);
-    } catch (error) {
-      console.error('Failed to fetch resources:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch resources';
-      toast.error(errorMessage);
-      setResources([]);
-      
-      // Log more details for debugging
-      if (error.response?.data?.error) {
-        console.error('Detailed error:', error.response.data.error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getCategoryIcon = (category) => {
     switch (category) {
@@ -112,8 +148,17 @@ const Resources = () => {
                 : 'Access mental health resources and support materials'}
             </p>
           </div>
-          {user?.role === 'student' && (
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchResources}
+              disabled={loading}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-2"
+              title="Refresh resources"
+            >
+              <span>{loading ? '⏳' : '🔄'}</span>
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+            {user?.role === 'student' && (
               <label className="flex items-center gap-2 cursor-pointer">
                 <span className="text-sm text-gray-700 dark:text-gray-300">All Resources</span>
                 <div className="relative">
@@ -133,8 +178,8 @@ const Resources = () => {
                 </div>
                 <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Personalized</span>
               </label>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         {personalized && user?.role === 'student' && testResultsCount !== null && (
           <div className={`mt-4 p-4 rounded-xl ${
