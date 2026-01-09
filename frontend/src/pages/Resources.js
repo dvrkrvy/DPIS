@@ -138,14 +138,60 @@ const Resources = () => {
   };
 
   const isYouTubeUrl = (url) => {
-    return url && (url.includes('youtube.com') || url.includes('youtu.be'));
+    if (!url) return false;
+    const urlLower = url.toLowerCase();
+    return urlLower.includes('youtube.com') || urlLower.includes('youtu.be');
   };
 
   const getYouTubeEmbedUrl = (url) => {
     if (!url) return null;
-    if (url.includes('embed')) return url;
-    const videoId = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    return videoId ? `https://www.youtube.com/embed/${videoId[1]}` : url;
+    
+    // If already an embed URL, return as-is
+    if (url.includes('/embed/')) {
+      return url.split('?')[0]; // Remove query params
+    }
+    
+    // Try to extract video ID from various YouTube URL formats
+    let videoId = null;
+    
+    // Format: https://www.youtube.com/watch?v=VIDEO_ID
+    const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (watchMatch) {
+      videoId = watchMatch[1];
+    }
+    
+    // Format: https://youtu.be/VIDEO_ID
+    if (!videoId) {
+      const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+      if (shortMatch) {
+        videoId = shortMatch[1];
+      }
+    }
+    
+    // Format: https://www.youtube.com/v/VIDEO_ID
+    if (!videoId) {
+      const vMatch = url.match(/youtube\.com\/v\/([a-zA-Z0-9_-]{11})/);
+      if (vMatch) {
+        videoId = vMatch[1];
+      }
+    }
+    
+    // Format: https://www.youtube.com/embed/VIDEO_ID
+    if (!videoId) {
+      const embedMatch = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+      if (embedMatch) {
+        videoId = embedMatch[1];
+      }
+    }
+    
+    // If we found a valid video ID, return embed URL
+    if (videoId) {
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    
+    // If no video ID found, return null to show fallback
+    console.warn('Could not extract YouTube video ID from URL:', url);
+    return null;
   };
 
   return (
@@ -278,18 +324,40 @@ const Resources = () => {
               <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-3">{resource.description}</p>
               
               {resource.category === 'video' && isYouTubeUrl(resource.url) ? (
-                <div className="mb-4">
-                  <div className="relative pb-[56.25%] h-0 overflow-hidden rounded">
-                    <iframe
-                      className="absolute top-0 left-0 w-full h-full"
-                      src={getYouTubeEmbedUrl(resource.url)}
-                      title={resource.title}
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    ></iframe>
-                  </div>
-                </div>
+                (() => {
+                  const embedUrl = getYouTubeEmbedUrl(resource.url);
+                  return embedUrl ? (
+                    <div className="mb-4">
+                      <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-lg bg-gray-900">
+                        <iframe
+                          className="absolute top-0 left-0 w-full h-full"
+                          src={embedUrl}
+                          title={resource.title}
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          loading="lazy"
+                        ></iframe>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-4">
+                      <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                        <div className="text-center p-4">
+                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">Video unavailable</p>
+                          <a
+                            href={resource.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium text-sm"
+                          >
+                            Open video <span className="ml-1">→</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : resource.url ? (
                 <a
                   href={resource.url}

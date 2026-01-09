@@ -133,10 +133,11 @@ router.get('/', authenticate, async (req, res) => {
         }
 
         // Order by priority if column exists, otherwise just by created date
+        // Limit to top 20 most relevant resources based on priority and matching
         if (hasPersonalizationColumns) {
-          query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 50';
+          query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 20';
         } else {
-          query += ' ORDER BY created_at DESC LIMIT 50';
+          query += ' ORDER BY created_at DESC LIMIT 20';
         }
       } else {
         // No test results yet - return general resources (those without test-specific targeting)
