@@ -410,4 +410,172 @@ router.get('/setup/status', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
+// Fix YouTube embed links - Update all video resources with embeddable videos
+router.post('/fix-youtube-embeds', authenticate, requireAdmin, async (req, res) => {
+  try {
+    console.log('🔧 Admin requested YouTube embed fix...');
+    
+    // Import the fix script logic
+    const fixScript = require('../scripts/fix-youtube-embeds');
+    
+    // The script exports a function, but we need to run it
+    // Since it's designed to run standalone, we'll replicate the logic here
+    const { Pool } = require('pg');
+    
+    // Use the same pool connection
+    const fixPool = pool;
+    
+    // Comprehensive list of reliable, embeddable YouTube videos
+    const embeddableVideos = {
+      'anxiety': ['WWloIAQpMcQ', 'ZPpucg3qwZE', '1nZEdqcGVzo'],
+      'depression': ['z-IR48Mb3W0', 'XiCrniLQGYc', '2IrdYkLQO50'],
+      'meditation': ['inpok4MKVLM', 'ZToicYcHIOU', '6hfOHS8Heo8'],
+      'breathing': ['tEmt1Znux58', 'tybOi4hjZFQ', '1wfB1Ysh-w0'],
+      'yoga': ['4pLUleLdwY4', 'v7AYKMP6rOE', 'U9YKY7fdwyg'],
+      'stress': ['ZToicYcHIOU', 'tEmt1Znux58', '6hfOHS8Heo8'],
+      'wellness': ['2iDj4-nWX_c', '75d_29QWELk', 'WPPPFqsECz0'],
+      'sleep': ['aEqlQvczAPQ', '1nZEdqcGVzo'],
+      'self-care': ['Aw71zanwMnY', '7Y-IgI6owFc'],
+      'cbt': ['g7B3n9jobus', 'hzB9YXqKGMY'],
+      'general': ['WWloIAQpMcQ', 'z-IR48Mb3W0', 'inpok4MKVLM'],
+    };
+    
+    const getVideoIdForResource = (contentType, tags, title) => {
+      const lowerTitle = (title || '').toLowerCase();
+      const lowerTags = (tags || []).map(t => t.toLowerCase());
+      
+      if (lowerTitle.includes('anxiety') || lowerTags.includes('anxiety')) {
+        return embeddableVideos.anxiety[0];
+      }
+      if (lowerTitle.includes('depression') || lowerTags.includes('depression')) {
+        return embeddableVideos.depression[0];
+      }
+      if (lowerTitle.includes('meditation') || lowerTags.includes('meditation') || lowerTags.includes('mindfulness')) {
+        return embeddableVideos.meditation[0];
+      }
+      if (lowerTitle.includes('breathing') || lowerTitle.includes('breath') || lowerTags.includes('breathing')) {
+        return embeddableVideos.breathing[0];
+      }
+      if (lowerTitle.includes('yoga') || lowerTags.includes('yoga')) {
+        return embeddableVideos.yoga[0];
+      }
+      if (lowerTitle.includes('stress') || lowerTags.includes('stress')) {
+        return embeddableVideos.stress[0];
+      }
+      if (lowerTitle.includes('sleep') || lowerTags.includes('sleep')) {
+        return embeddableVideos.sleep[0];
+      }
+      
+      if (contentType && embeddableVideos[contentType]) {
+        return embeddableVideos[contentType][0];
+      }
+      
+      return embeddableVideos.wellness[0];
+    };
+    
+    // Get all video resources
+    const result = await fixPool.query(`
+      SELECT id, title, url, content_type, tags, category
+      FROM resources
+      WHERE category IN ('video', 'audio')
+      AND url LIKE '%youtube%'
+    `);
+    
+    console.log(`📹 Found ${result.rows.length} video/audio resources with YouTube URLs`);
+    
+    let updated = 0;
+    let errors = 0;
+    const updates = [];
+    
+    for (const resource of result.rows) {
+      try {
+        let currentVideoId = null;
+        const embedMatch = resource.url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+        const watchMatch = resource.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+        const shortMatch = resource.url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+        
+        if (embedMatch) currentVideoId = embedMatch[1];
+        else if (watchMatch) currentVideoId = watchMatch[1];
+        else if (shortMatch) currentVideoId = shortMatch[1];
+        
+        const newVideoId = getVideoIdForResource(
+          resource.content_type,
+          resource.tags,
+          resource.title
+        );
+        
+        if (newVideoId && newVideoId !== currentVideoId) {
+          const newUrl = `https://www.youtube.com/embed/${newVideoId}`;
+          
+          await fixPool.query(
+            `UPDATE resources SET url = $1 WHERE id = $2`,
+            [newUrl, resource.id]
+          );
+          
+          updates.push({ title: resource.title, oldId: currentVideoId, newId: newVideoId });
+          updated++;
+        } else if (currentVideoId) {
+          const embedUrl = `https://www.youtube.com/embed/${currentVideoId}`;
+          if (resource.url !== embedUrl) {
+            await fixPool.query(
+              `UPDATE resources SET url = $1 WHERE id = $2`,
+              [embedUrl, resource.id]
+            );
+            updates.push({ title: resource.title, action: 'format_fixed' });
+            updated++;
+          }
+        } else {
+          const newVideoId = getVideoIdForResource(
+            resource.content_type,
+            resource.tags,
+            resource.title
+          );
+          const newUrl = `https://www.youtube.com/embed/${newVideoId}`;
+          
+          await fixPool.query(
+            `UPDATE resources SET url = $1 WHERE id = $2`,
+            [newUrl, resource.id]
+          );
+          
+          updates.push({ title: resource.title, action: 'assigned_new', newId: newVideoId });
+          updated++;
+        }
+      } catch (error) {
+        console.error(`❌ Error updating resource "${resource.title}":`, error.message);
+        errors++;
+      }
+    }
+    
+    // Verify the updates
+    const verifyResult = await fixPool.query(`
+      SELECT COUNT(*) as count
+      FROM resources
+      WHERE category IN ('video', 'audio')
+      AND url LIKE '%youtube.com/embed/%'
+    `);
+    
+    console.log(`✅ YouTube embed fix completed: ${updated} updated, ${errors} errors`);
+    
+    res.json({
+      success: true,
+      message: 'YouTube embeds fixed successfully',
+      summary: {
+        totalFound: result.rows.length,
+        updated,
+        errors,
+        totalWithEmbedUrls: parseInt(verifyResult.rows[0].count)
+      },
+      updates: updates.slice(0, 20), // Return first 20 updates for preview
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error fixing YouTube embeds:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fix YouTube embeds',
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;
