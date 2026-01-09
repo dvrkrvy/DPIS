@@ -33,14 +33,14 @@ router.get('/', authenticate, async (req, res) => {
       hasPersonalizationColumns = false;
     }
     
-    console.log(`🔍 Personalization check: personalized=${personalized}, role=${req.user.role}, hasColumns=${hasPersonalizationColumns}`);
+    console.log(`🔍 Personalization check: personalized=${personalized}, isPersonalized=${isPersonalized}, role=${req.user.role}, hasColumns=${hasPersonalizationColumns}`);
     
     let query = 'SELECT * FROM resources WHERE is_active = true';
     const params = [];
     let paramCount = 0;
 
     // If personalized is true and columns exist, filter based on user's last 3 test results
-    if (personalized === 'true' && req.user.role === 'student' && hasPersonalizationColumns) {
+    if (isPersonalized && req.user.role === 'student' && hasPersonalizationColumns) {
       // Get user's last 3 test results
       const testResults = await pool.query(
         `SELECT test_type, severity 
@@ -175,7 +175,7 @@ router.get('/', authenticate, async (req, res) => {
     
     // Get test results count for personalized responses
     let testResultsCount = null;
-    if (personalized === 'true' && req.user.role === 'student') {
+    if (isPersonalized && req.user.role === 'student') {
       try {
         const countResult = await pool.query(
           'SELECT COUNT(*) as count FROM screening_results WHERE user_id = $1', 
@@ -188,7 +188,7 @@ router.get('/', authenticate, async (req, res) => {
     }
     
     // If personalized but no resources found, check if resources exist with personalization data
-    if (personalized === 'true' && hasPersonalizationColumns && result.rows.length === 0) {
+    if (isPersonalized && hasPersonalizationColumns && result.rows.length === 0) {
       const testResults = await pool.query(
         `SELECT test_type, severity 
          FROM screening_results 
@@ -218,7 +218,7 @@ router.get('/', authenticate, async (req, res) => {
     
     res.json({ 
       resources: result.rows,
-      personalized: personalized === 'true' && hasPersonalizationColumns,
+      personalized: isPersonalized && hasPersonalizationColumns,
       testResultsCount: testResultsCount
     });
   } catch (error) {
