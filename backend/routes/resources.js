@@ -9,8 +9,13 @@ router.get('/', authenticate, async (req, res) => {
     const { category, contentType, search, personalized } = req.query;
     const userId = req.user.id;
     
-    console.log(`📥 Resources request - User: ${userId}, Role: ${req.user.role}, Personalized param: ${personalized}`);
+    // Debug: Log raw query object
+    console.log(`📥 Raw req.query:`, JSON.stringify(req.query));
+    console.log(`📥 Resources request - User: ${userId}, Role: ${req.user.role}, Personalized param: ${personalized} (type: ${typeof personalized})`);
     console.log(`📥 Query params:`, { category, contentType, search, personalized });
+    
+    // Normalize personalized parameter (handle string 'true'/'false' or boolean)
+    const isPersonalized = personalized === 'true' || personalized === true;
     
     // First check if personalized columns exist in the database
     // Default to false if check fails - will use backward-compatible queries
