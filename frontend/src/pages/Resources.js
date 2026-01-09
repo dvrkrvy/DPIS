@@ -71,6 +71,18 @@ const Resources = () => {
       fetchResources();
     }
   }, [location.pathname, token, fetchResources]);
+  
+  // Listen for storage events (when test results are updated from another tab/window)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'testSubmitted' && token) {
+        console.log('🔄 Test submitted detected, refreshing resources...');
+        fetchResources();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [token, fetchResources]);
 
   // Refresh when filters or personalized toggle changes
   useEffect(() => {
