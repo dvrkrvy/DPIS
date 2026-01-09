@@ -21,16 +21,23 @@ router.get('/', authenticate, async (req, res) => {
     // Default to false if check fails - will use backward-compatible queries
     let hasPersonalizationColumns = false;
     try {
+      // Force a fresh connection check - sometimes connection pools cache schema info
+      await pool.query('SELECT 1'); // Ping to ensure connection is fresh
+      
       const columnCheck = await pool.query(`
         SELECT column_name 
         FROM information_schema.columns 
-        WHERE table_name = 'resources' 
+        WHERE table_schema = 'public'
+        AND table_name = 'resources' 
         AND column_name IN ('test_types', 'severity_levels', 'priority')
       `);
       hasPersonalizationColumns = columnCheck.rows.length === 3;
       console.log(`📊 Personalization columns check: ${hasPersonalizationColumns ? '✅ EXISTS' : '❌ MISSING'}`);
       if (hasPersonalizationColumns) {
         console.log(`   Found columns: ${columnCheck.rows.map(r => r.column_name).join(', ')}`);
+      } else {
+        console.log(`   Expected 3 columns, found: ${columnCheck.rows.length}`);
+        console.log(`   Columns found: ${columnCheck.rows.map(r => r.column_name).join(', ') || 'NONE'}`);
       }
     } catch (colError) {
       // If we can't check columns, assume they don't exist (safe default)
