@@ -98,10 +98,10 @@ app.use(cors({
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
       } else {
-        // In production, allow file:// origins for setup tools (temporary)
-        // This allows the HTML setup tool to work from local files
-        if (origin === 'null' || origin.startsWith('file://')) {
-          console.log(`Allowing file:// origin for setup tool`);
+        // In production, allow file:// origins and null origins for setup tools
+        // This allows the HTML setup tool to work from local files and browser console
+        if (origin === 'null' || !origin || origin.startsWith('file://')) {
+          console.log(`Allowing origin for setup tool: ${origin || 'null'}`);
           callback(null, true);
         } else {
           console.warn(`CORS blocked origin: ${origin}`);
