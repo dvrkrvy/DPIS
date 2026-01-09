@@ -147,17 +147,34 @@
                 return;
             }
 
+            // Ensure backend URL doesn't have trailing slash
+            const cleanBackendUrl = backendUrl.replace(/\/$/, '');
+
             document.getElementById('createAdminBtn').disabled = true;
             document.getElementById('createAdminResult').innerHTML = '<span class="info">Creating admin account...</span>';
 
             try {
-                const response = await fetch(`${backendUrl}/api/auth/admin/create-first`, {
+                const url = `${cleanBackendUrl}/api/auth/admin/create-first`;
+                console.log('Calling:', url);
+                
+                const response = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, name })
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password, name }),
+                    mode: 'cors'
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    const text = await response.text();
+                    throw new Error(`Server returned: ${response.status} ${response.statusText}. Response: ${text.substring(0, 200)}`);
+                }
+
                 if (response.ok) {
                     document.getElementById('createAdminResult').innerHTML = 
                         `<span class="success">✅ Admin account created successfully!<br>Email: ${data.admin.email}<br>You can now use these credentials to login.</span>`;
@@ -166,13 +183,22 @@
                     document.getElementById('adminPassword').value = password;
                 } else {
                     document.getElementById('createAdminResult').innerHTML = 
-                        `<span class="error">❌ Failed: ${data.message || 'Unknown error'}</span>`;
+                        `<span class="error">❌ Failed: ${data.message || 'Unknown error'}<br>Status: ${response.status}</span>`;
                     document.getElementById('createAdminBtn').disabled = false;
                 }
             } catch (error) {
+                let errorMsg = error.message;
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMsg = `Cannot connect to backend. Check:<br>
+                        1. Backend URL is correct: ${cleanBackendUrl}<br>
+                        2. Backend is running and accessible<br>
+                        3. CORS is enabled on the backend<br>
+                        4. No firewall blocking the request`;
+                }
                 document.getElementById('createAdminResult').innerHTML = 
-                    `<span class="error">❌ Error: ${error.message}</span>`;
+                    `<span class="error">❌ Error: ${errorMsg}</span>`;
                 document.getElementById('createAdminBtn').disabled = false;
+                console.error('Create admin error:', error);
             }
         }
 
