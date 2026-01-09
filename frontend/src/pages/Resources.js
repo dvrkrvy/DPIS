@@ -37,7 +37,9 @@ const Resources = () => {
       const url = `/api/resources?${params}`;
       console.log('🔍 Fetching resources with params:', params.toString());
       console.log('🔍 Full URL:', url);
-      console.log('🔍 Personalized:', personalized, 'User role:', user?.role);
+      console.log('🔍 Personalized toggle:', personalized);
+      console.log('🔍 User role:', user?.role);
+      console.log('🔍 Personalized param in URL:', params.get('personalized'));
       
       const response = await api.get(url, {
         headers: { Authorization: `Bearer ${token}` }
