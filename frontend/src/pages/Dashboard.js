@@ -2,16 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
   const { token, user } = useAuth();
+  const { darkMode } = useTheme();
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
+  const [testResults, setTestResults] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchTestResults();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -37,12 +41,28 @@ const Dashboard = () => {
     }
   };
 
+  const fetchTestResults = async () => {
+    try {
+      const response = await api.get('/api/screening/latest', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTestResults(response.data.results || []);
+    } catch (error) {
+      console.error('Failed to load test results:', error);
+      // Don't show error toast for this, just log it
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div className={`flex items-center justify-center min-h-screen transition-colors ${
+        darkMode ? 'bg-black' : 'bg-gray-50'
+      }`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading dashboard...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4 ${
+            darkMode ? 'border-purple-500' : 'border-purple-600'
+          }`}></div>
+          <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Loading dashboard...</p>
         </div>
       </div>
     );
@@ -50,13 +70,30 @@ const Dashboard = () => {
 
   if (!dashboardData) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
-        <p className="text-gray-400">Failed to load dashboard data</p>
+      <div className={`flex items-center justify-center min-h-screen transition-colors ${
+        darkMode ? 'bg-black' : 'bg-gray-50'
+      }`}>
+        <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Failed to load dashboard data</p>
       </div>
     );
   }
 
-  const userName = user?.anonymous_id || user?.name || 'Alex';
+  // Get username properly
+  const getUserDisplayName = () => {
+    if (user?.anonymous_id) {
+      const id = user.anonymous_id;
+      if (id.length > 12) {
+        return id.substring(0, 8) + '...';
+      }
+      return id;
+    }
+    if (user?.name) {
+      return user.name;
+    }
+    return 'User';
+  };
+
+  const userName = getUserDisplayName();
   const resilienceChange = dashboardData.cognitiveResilience?.change || 12;
   const pendingCount = dashboardData.pendingAssessments?.count || 2;
   const completionPercentage = dashboardData.pendingAssessments?.completionPercentage || 75;
@@ -114,6 +151,18 @@ const Dashboard = () => {
     heightPercent: (item.value / maxValue) * 100
   }));
 
+  const getSeverityColor = (severity) => {
+    switch (severity) {
+      case 'minimal': return 'bg-green-500/20 text-green-400 border-green-500/20';
+      case 'mild': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
+      case 'moderate': return 'bg-orange-500/20 text-orange-400 border-orange-500/20';
+      case 'severe':
+      case 'moderately_severe':
+        return 'bg-red-500/20 text-red-400 border-red-500/20';
+      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/20';
+    }
+  };
+
   const handleShareQuote = () => {
     const text = `${dailyInsight.quote} ${dailyInsight.author}`;
     if (navigator.share) {
@@ -130,39 +179,54 @@ const Dashboard = () => {
     }
   };
 
+  // Theme-aware classes
+  const bgMain = darkMode ? 'bg-black' : 'bg-gray-50';
+  const textMain = darkMode ? 'text-white' : 'text-gray-900';
+  const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-600';
+  const cardBg = darkMode ? 'bg-gray-900' : 'bg-white';
+  const cardBorder = darkMode ? 'border-gray-800' : 'border-gray-200';
+
   return (
-    <div className="min-h-screen bg-black text-white font-sans antialiased overflow-x-hidden">
+    <div className={`min-h-screen font-sans antialiased overflow-x-hidden transition-colors ${bgMain} ${textMain}`}>
       <main className="pt-32 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
         {/* Hero Welcome Section */}
-        <div className="reveal-up relative rounded-3xl overflow-hidden h-[400px] border border-white/10 shadow-2xl group">
+        <div className={`reveal-up relative rounded-3xl overflow-hidden h-[400px] border shadow-2xl group ${
+          darkMode ? 'border-white/10' : 'border-gray-200'
+        }`}>
           <div 
             className="absolute inset-0 bg-cover bg-center transition-transform duration-[20s] ease-linear transform group-hover:scale-110"
             style={{
               backgroundImage: "url('https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=2560&auto=format&fit=crop')"
             }}
           ></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
+          <div className={`absolute inset-0 ${darkMode ? 'bg-gradient-to-r from-black via-black/80 to-transparent' : 'bg-gradient-to-r from-white via-white/80 to-transparent'}`}></div>
           
           <div className="relative z-10 h-full flex flex-col justify-center px-10 max-w-3xl">
             {/* AI Analysis Complete Badge */}
-            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md rounded-full px-3 py-1 w-fit mb-6 border border-white/10">
+            <div className={`inline-flex items-center space-x-2 backdrop-blur-md rounded-full px-3 py-1 w-fit mb-6 border ${
+              darkMode ? 'bg-white/10 border-white/10' : 'bg-black/10 border-black/10'
+            }`}>
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-500 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
               </span>
-              <span className="text-xs font-mono text-cyan-400">AI ANALYSIS COMPLETE</span>
+              <span className={`text-xs font-mono ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}>AI ANALYSIS COMPLETE</span>
             </div>
 
-            <h1 className="text-5xl md:text-6xl font-bold text-white tracking-tight mb-4 leading-tight">
+            <h1 className={`text-5xl md:text-6xl font-bold tracking-tight mb-4 leading-tight ${
+              darkMode ? 'text-white' : 'text-gray-900'
+            }`}>
               Welcome back, <br/>
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-400 to-cyan-400">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-purple-400 to-cyan-400">
                 {userName}.
               </span>
             </h1>
             
-            <p className="text-lg text-gray-300 mb-8 max-w-xl font-light">
+            <p className={`text-lg mb-8 max-w-xl font-light ${
+              darkMode ? 'text-gray-300' : 'text-gray-700'
+            }`}>
               Your cognitive resilience score has increased by{' '}
-              <span className="text-green-400 font-semibold">+{resilienceChange}%</span> this week. 
+              <span className="text-green-500 font-semibold">+{resilienceChange}%</span> this week. 
               Continue your journey with today's recommended session.
             </p>
 
@@ -178,13 +242,61 @@ const Dashboard = () => {
               </button>
               <button
                 onClick={() => navigate('/progress')}
-                className="bg-white/5 hover:bg-white/10 border border-white/20 text-white px-8 py-3.5 rounded-xl font-semibold transition-all backdrop-blur-sm"
+                className={`px-8 py-3.5 rounded-xl font-semibold transition-all backdrop-blur-sm border ${
+                  darkMode 
+                    ? 'bg-white/5 hover:bg-white/10 border-white/20 text-white' 
+                    : 'bg-gray-900/5 hover:bg-gray-900/10 border-gray-900/20 text-gray-900'
+                }`}
               >
                 View Insights
               </button>
             </div>
           </div>
         </div>
+
+        {/* Test Results Section */}
+        {testResults.length > 0 && (
+          <div className={`reveal-up delay-100 ${cardBg} ${cardBorder} rounded-2xl p-6 shadow-lg border`}>
+            <h3 className={`text-lg font-semibold mb-4 ${textMain}`}>Recent Test Results</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {testResults.slice(0, 3).map((result, index) => (
+                <div 
+                  key={index}
+                  className={`p-4 rounded-xl border ${
+                    darkMode 
+                      ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-800' 
+                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                  } transition-colors`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className={`font-semibold ${textMain}`}>{result.test_type}</h4>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${getSeverityColor(result.severity)}`}>
+                      {result.severity.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <p className={`text-2xl font-bold mb-1 ${
+                    darkMode ? 'text-purple-400' : 'text-purple-600'
+                  }`}>
+                    {result.score}
+                  </p>
+                  <p className={`text-xs ${textSecondary}`}>
+                    {new Date(result.created_at).toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric' 
+                    })}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => navigate('/screening')}
+              className="mt-4 text-sm text-purple-600 hover:text-purple-700 font-semibold"
+            >
+              View All Results →
+            </button>
+          </div>
+        )}
 
         {/* Widgets Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -193,32 +305,36 @@ const Dashboard = () => {
             {/* Top Widgets */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Screening Tests Widget */}
-              <div className="reveal-up delay-100 group relative p-6 bg-gray-900 border border-gray-800 rounded-2xl hover:border-purple-500/50 transition-all duration-300 cursor-pointer overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500">
+              <div className={`reveal-up delay-100 group relative p-6 ${cardBg} ${cardBorder} rounded-2xl hover:border-purple-500/50 transition-all duration-300 cursor-pointer overflow-hidden border`}>
+                <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110 duration-500`}>
                   <div className="w-32 h-32 bg-purple-500 rounded-full"></div>
                 </div>
                 <div className="relative z-10">
-                  <div className="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center text-purple-400 mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors shadow-lg shadow-purple-500/20">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:text-white transition-colors shadow-lg ${
+                    darkMode 
+                      ? 'bg-purple-600/20 text-purple-400 group-hover:bg-purple-600' 
+                      : 'bg-purple-100 text-purple-600 group-hover:bg-purple-600'
+                  }`}>
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                       <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-1 group-hover:text-purple-400 transition-colors">Screening Tests</h3>
-                  <p className="text-sm text-gray-400 mb-4">{pendingCount} pending assessments available.</p>
-                  <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden mb-2">
+                  <h3 className={`text-xl font-semibold mb-1 group-hover:text-purple-400 transition-colors ${textMain}`}>Screening Tests</h3>
+                  <p className={`text-sm mb-4 ${textSecondary}`}>{pendingCount} pending assessments available.</p>
+                  <div className={`w-full rounded-full h-1.5 overflow-hidden mb-2 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
                     <div 
                       className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
                       style={{ width: `${completionPercentage}%` }}
                     ></div>
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500">
+                  <div className={`flex justify-between text-xs ${textSecondary}`}>
                     <span>Progress</span>
                     <span>{completionPercentage}%</span>
                   </div>
                   <button
                     onClick={() => navigate('/screening')}
-                    className="w-full mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors"
+                    className="w-full mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors text-white"
                   >
                     Take Assessment
                   </button>
@@ -226,27 +342,33 @@ const Dashboard = () => {
               </div>
 
               {/* Library Widget */}
-              <div className="reveal-up delay-200 group relative h-full min-h-[220px] rounded-2xl overflow-hidden cursor-pointer border border-gray-800 hover:border-cyan-500/50 transition-all">
+              <div className={`reveal-up delay-200 group relative h-full min-h-[220px] rounded-2xl overflow-hidden cursor-pointer border transition-all ${cardBorder} hover:border-cyan-500/50`}>
                 <div 
                   className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                   style={{
                     backgroundImage: "url('https://images.unsplash.com/photo-1506126613408-eca07ce68773?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80')"
                   }}
                 ></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+                <div className={`absolute inset-0 ${darkMode ? 'bg-gradient-to-t from-black via-black/60 to-transparent' : 'bg-gradient-to-t from-white via-white/60 to-transparent'}`}></div>
                 <div className="absolute inset-0 p-6 flex flex-col justify-end z-10">
-                  <div className="mb-auto w-fit p-2 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 text-cyan-400">
+                  <div className={`mb-auto w-fit p-2 backdrop-blur-md rounded-lg border ${
+                    darkMode ? 'bg-black/40 border-white/10 text-cyan-400' : 'bg-white/80 border-gray-300 text-cyan-600'
+                  }`}>
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-1 group-hover:text-cyan-400 transition-colors">Library</h3>
-                  <p className="text-sm text-gray-300">
+                  <h3 className={`text-xl font-semibold mb-1 group-hover:text-cyan-400 transition-colors ${textMain}`}>Library</h3>
+                  <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                     {newResourcesCount > 0 ? `${newResourcesCount} new meditation guides added.` : 'New meditation guides added.'}
                   </p>
                   <button
                     onClick={() => navigate('/resources')}
-                    className="mt-4 w-full px-4 py-2 bg-cyan-600/80 hover:bg-cyan-600 rounded-lg font-semibold transition-colors backdrop-blur-sm"
+                    className={`mt-4 w-full px-4 py-2 rounded-lg font-semibold transition-colors backdrop-blur-sm ${
+                      darkMode 
+                        ? 'bg-cyan-600/80 hover:bg-cyan-600 text-white' 
+                        : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                    }`}
                   >
                     Explore Library
                   </button>
@@ -265,9 +387,14 @@ const Dashboard = () => {
                 <button
                   key={item.label}
                   onClick={() => navigate(item.route)}
-                  className={`reveal-up delay-300 bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-white/5 transition-colors cursor-pointer group`}
+                  className={`reveal-up delay-300 ${cardBg} ${cardBorder} rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:bg-opacity-50 transition-colors cursor-pointer group border`}
                 >
-                  <div className={`p-3 rounded-full bg-${item.color}-500/10 text-${item.color}-400 group-hover:bg-${item.color}-500 group-hover:text-white transition-all shadow-lg`}>
+                  <div className={`p-3 rounded-full group-hover:text-white transition-all shadow-lg ${
+                    item.color === 'green' ? 'bg-green-500/10 text-green-400 group-hover:bg-green-500' :
+                    item.color === 'orange' ? 'bg-orange-500/10 text-orange-400 group-hover:bg-orange-500' :
+                    item.color === 'pink' ? 'bg-pink-500/10 text-pink-400 group-hover:bg-pink-500' :
+                    'bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500'
+                  }`}>
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                       {item.icon === 'forum' && <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />}
                       {item.icon === 'calendar' && <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />}
@@ -275,39 +402,47 @@ const Dashboard = () => {
                       {item.icon === 'insights' && <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />}
                     </svg>
                   </div>
-                  <span className="text-sm font-medium text-gray-300">{item.label}</span>
+                  <span className={`text-sm font-medium ${textSecondary}`}>{item.label}</span>
                 </button>
               ))}
             </div>
 
             {/* Mental Resilience Trends */}
-            <div className="reveal-up delay-400 bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-lg">
+            <div className={`reveal-up delay-400 ${cardBg} ${cardBorder} rounded-2xl p-6 shadow-lg border`}>
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Mental Resilience Trends</h3>
-                  <p className="text-xs text-gray-500">Last 6 Months Data</p>
+                  <h3 className={`text-lg font-semibold ${textMain}`}>Mental Resilience Trends</h3>
+                  <p className={`text-xs ${textSecondary}`}>Last 6 Months Data</p>
                 </div>
                 <button
                   onClick={() => navigate('/progress')}
-                  className="text-xs border border-white/10 hover:bg-white/5 px-3 py-1 rounded text-gray-400 transition-colors"
+                  className={`text-xs border rounded px-3 py-1 transition-colors ${
+                    darkMode 
+                      ? 'border-white/10 hover:bg-white/5 text-gray-400' 
+                      : 'border-gray-300 hover:bg-gray-100 text-gray-600'
+                  }`}
                 >
                   Export Report
                 </button>
               </div>
               <div className="relative h-64 w-full flex items-end justify-between px-2 gap-2">
                 {/* Grid lines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-0 opacity-20">
+                <div className={`absolute inset-0 flex flex-col justify-between pointer-events-none pb-0 opacity-20 ${
+                  darkMode ? '' : 'border-gray-300'
+                }`}>
                   {[0, 1, 2, 3].map(i => (
-                    <div key={i} className="w-full border-t border-dashed border-white"></div>
+                    <div key={i} className={`w-full border-t border-dashed ${darkMode ? 'border-white' : 'border-gray-300'}`}></div>
                   ))}
                 </div>
                 {/* Bars */}
                 {barHeights.map((item, index) => (
                   <div key={item.month} className="flex-1 flex flex-col justify-end items-center gap-2 group cursor-pointer">
                     <div 
-                      className={`w-full max-w-[40px] bg-white/5 rounded-t-sm transition-all duration-500 group-hover:bg-white/10 relative overflow-hidden ${
-                        index === barHeights.length - 1 ? 'shadow-lg shadow-purple-500/30' : ''
-                      }`}
+                      className={`w-full max-w-[40px] rounded-t-sm transition-all duration-500 group-hover:opacity-90 relative overflow-hidden ${
+                        darkMode 
+                          ? 'bg-white/5 group-hover:bg-white/10' 
+                          : 'bg-gray-200 group-hover:bg-gray-300'
+                      } ${index === barHeights.length - 1 ? 'shadow-lg shadow-purple-500/30' : ''}`}
                       style={{ height: `${Math.max(item.heightPercent, 20)}%` }}
                     >
                       <div 
@@ -319,7 +454,11 @@ const Dashboard = () => {
                         style={{ height: `${item.heightPercent}%` }}
                       ></div>
                     </div>
-                    <span className={`text-[10px] font-mono ${index === barHeights.length - 1 ? 'text-white font-bold' : 'text-gray-500'}`}>
+                    <span className={`text-[10px] font-mono ${
+                      index === barHeights.length - 1 
+                        ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
+                        : textSecondary
+                    }`}>
                       {item.month}
                     </span>
                   </div>
@@ -331,23 +470,29 @@ const Dashboard = () => {
           {/* Right Column - Sidebar */}
           <div className="lg:col-span-4 space-y-6">
             {/* Recent Activity */}
-            <div className="reveal-up delay-200 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-lg h-fit">
-              <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/5 backdrop-blur-sm">
-                <h3 className="font-semibold text-white flex items-center gap-2">
+            <div className={`reveal-up delay-200 ${cardBg} ${cardBorder} rounded-2xl overflow-hidden shadow-lg h-fit border`}>
+              <div className={`p-5 border-b flex justify-between items-center backdrop-blur-sm ${
+                darkMode ? 'border-white/5 bg-white/5' : 'border-gray-200 bg-gray-50'
+              }`}>
+                <h3 className={`font-semibold flex items-center gap-2 ${textMain}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span> Recent Activity
                 </h3>
                 <button 
                   onClick={() => navigate('/progress')}
-                  className="text-xs text-cyan-400 hover:text-white transition-colors"
+                  className={`text-xs transition-colors ${
+                    darkMode ? 'text-cyan-400 hover:text-white' : 'text-cyan-600 hover:text-cyan-700'
+                  }`}
                 >
                   See All
                 </button>
               </div>
-              <div className="divide-y divide-white/5">
+              <div className={`divide-y ${darkMode ? 'divide-white/5' : 'divide-gray-200'}`}>
                 {recentActivities.slice(0, 3).map((activity, index) => (
                   <div 
                     key={index}
-                    className="p-4 hover:bg-white/5 transition-colors group cursor-pointer relative overflow-hidden"
+                    className={`p-4 hover:opacity-80 transition-colors group cursor-pointer relative overflow-hidden ${
+                      darkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'
+                    }`}
                   >
                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                       activity.status === 'STABLE' ? 'bg-green-500' :
@@ -355,13 +500,13 @@ const Dashboard = () => {
                       'bg-orange-500'
                     } transform -translate-x-full group-hover:translate-x-0 transition-transform`}></div>
                     <div className="flex justify-between items-start mb-1">
-                      <h4 className="font-medium text-gray-200 group-hover:text-white">{activity.label}</h4>
+                      <h4 className={`font-medium group-hover:opacity-90 ${textMain}`}>{activity.label}</h4>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${activity.statusColor || 'bg-green-500/20 text-green-400 border-green-500/20'}`}>
                         {activity.status}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 mb-2">{activity.time}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <p className={`text-xs mb-2 ${textSecondary}`}>{activity.time}</p>
+                    <div className={`flex items-center gap-2 text-xs ${textSecondary}`}>
                       {activity.description && (
                         <>
                           {activity.type === 'sleep_pattern' ? (
@@ -386,7 +531,7 @@ const Dashboard = () => {
                                 e.stopPropagation();
                                 navigate('/ai-chat');
                               }}
-                              className="ml-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-xs font-semibold transition-colors"
+                              className="ml-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-xs font-semibold transition-colors text-white"
                             >
                               ASK AI Support Assistant
                             </button>
@@ -400,28 +545,42 @@ const Dashboard = () => {
             </div>
 
             {/* Daily Insight */}
-            <div className="reveal-up delay-300 relative bg-gradient-to-br from-gray-900 to-black rounded-2xl border border-white/10 overflow-hidden shadow-lg p-6 group">
+            <div className={`reveal-up delay-300 relative rounded-2xl border overflow-hidden shadow-lg p-6 group ${
+              darkMode 
+                ? 'bg-gradient-to-br from-gray-900 to-black border-white/10' 
+                : 'bg-gradient-to-br from-gray-50 to-white border-gray-200'
+            }`}>
               <div 
-                className="absolute inset-0 bg-cover bg-center opacity-20 group-hover:opacity-30 transition-opacity duration-700"
+                className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ${
+                  darkMode ? 'opacity-20 group-hover:opacity-30' : 'opacity-10 group-hover:opacity-20'
+                }`}
                 style={{
                   backgroundImage: "url('https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80')"
                 }}
               ></div>
-              <div className="absolute top-0 right-0 p-4 opacity-20">
-                <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <div className={`absolute top-0 right-0 p-4 opacity-20 ${textSecondary}`}>
+                <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="relative z-10">
-                <span className="text-xs font-mono text-purple-400 uppercase tracking-widest mb-2 block">Daily Insight</span>
-                <p className="text-lg font-serif italic text-gray-100 mb-4 leading-relaxed">
+                <span className={`text-xs font-mono uppercase tracking-widest mb-2 block ${
+                  darkMode ? 'text-purple-400' : 'text-purple-600'
+                }`}>Daily Insight</span>
+                <p className={`text-lg font-serif italic mb-4 leading-relaxed ${
+                  darkMode ? 'text-gray-100' : 'text-gray-800'
+                }`}>
                   "{dailyInsight.quote}"
                 </p>
                 <div className="h-px w-10 bg-cyan-500 mb-3"></div>
-                <p className="text-sm text-gray-400 font-medium mb-6">{dailyInsight.author}</p>
+                <p className={`text-sm font-medium mb-6 ${textSecondary}`}>{dailyInsight.author}</p>
                 <button
                   onClick={handleShareQuote}
-                  className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center gap-2"
+                  className={`w-full py-2 border rounded-lg text-sm transition-colors flex items-center justify-center gap-2 ${
+                    darkMode 
+                      ? 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-300' 
+                      : 'bg-gray-900/5 hover:bg-gray-900/10 border-gray-300 text-gray-700'
+                  }`}
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
@@ -434,19 +593,9 @@ const Dashboard = () => {
         </div>
       </main>
 
-      {/* Floating Action Buttons */}
+      {/* New Floating Action Buttons - Replacing old ones */}
       <div className="fixed bottom-8 right-8 flex flex-col gap-4 z-40 items-end">
-        <button 
-          className="flex items-center justify-center w-14 h-14 rounded-full bg-gray-900 border border-white/10 text-white shadow-lg hover:scale-110 transition-transform group relative overflow-hidden"
-          onClick={() => navigate('/help')}
-        >
-          <svg className="w-6 h-6 relative z-10" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-          </svg>
-          <span className="absolute right-16 bg-black text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10">
-            Help Center
-          </span>
-        </button>
+        {/* AI Support Assistant Button */}
         <button 
           className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-cyan-500 hover:brightness-110 text-white pl-4 pr-6 py-4 rounded-full shadow-lg shadow-purple-500/40 transition-all hover:scale-105"
           onClick={() => navigate('/ai-chat')}
@@ -461,12 +610,31 @@ const Dashboard = () => {
             <span className="font-bold text-sm">Support Assistant</span>
           </div>
         </button>
+
+        {/* Emergency Button */}
+        <button 
+          className={`flex items-center justify-center w-12 h-12 rounded-full border shadow-lg transition-all hover:scale-110 ${
+            darkMode 
+              ? 'bg-red-600/10 border-red-500/50 text-red-500 hover:bg-red-600 hover:text-white' 
+              : 'bg-red-50 border-red-300 text-red-600 hover:bg-red-600 hover:text-white'
+          }`}
+          onClick={() => navigate('/emergency')}
+          title="Emergency Support"
+        >
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+        </button>
       </div>
 
       {/* Background gradient effects */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px] opacity-30"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-500/20 rounded-full blur-[120px] opacity-20"></div>
+        <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] opacity-30 ${
+          darkMode ? 'bg-purple-600/20' : 'bg-purple-400/10'
+        }`}></div>
+        <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] opacity-20 ${
+          darkMode ? 'bg-cyan-500/20' : 'bg-cyan-400/10'
+        }`}></div>
       </div>
 
       <style>{`
