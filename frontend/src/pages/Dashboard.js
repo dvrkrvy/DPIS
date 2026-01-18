@@ -242,15 +242,6 @@ const Dashboard = () => {
     return Math.max(percentage, 10); // Ensure minimum visibility
   };
   
-  // Helper to get score portion percentage within the bar
-  // The colored portion represents the actual score
-  const getScoreHeight = (score, maxScore) => {
-    if (!score || !maxScore) return 0;
-    // The colored portion is always 100% of the bar (since bar height = score)
-    // But we show gray remainder up to maxScore for visual reference
-    return 100; // Full bar is colored since bar height represents actual score
-  };
-  
   // Helper to get remaining portion (gray section) - shows potential up to maxScore
   // Gray section is scaled proportionally but doesn't affect score comparison
   const getRemainingHeight = (score, maxScore) => {
