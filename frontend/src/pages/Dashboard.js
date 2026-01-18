@@ -221,11 +221,6 @@ const Dashboard = () => {
     ? Math.max(...testScoreData.map(t => t.score || 0), 1) // At least 1 to avoid division by zero
     : 1;
   
-  // Also find max possible score to scale gray portions
-  const maxPossibleScore = testScoreData.length > 0
-    ? Math.max(...testScoreData.map(t => t.maxScore || 27), 27)
-    : 27;
-  
   // Calculate dynamic graph height - make it larger for better visibility
   const getGraphHeight = () => {
     if (testScoreData.length === 0) return 400; // Default height
