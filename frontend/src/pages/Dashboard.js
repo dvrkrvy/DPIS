@@ -215,34 +215,70 @@ const Dashboard = () => {
 
   const testScoreData = processTestScores();
   
-  // Find the maximum maxScore across all tests to scale graph properly
-  const maxPossibleScore = testScoreData.length > 0 
-    ? Math.max(...testScoreData.map(t => t.maxScore || 27), 27) // At least 27 to avoid division by zero
-    : 27;
+  // Find the maximum ACTUAL score across all tests for proportional scaling
+  // This ensures score 10 is twice as tall as score 5
+  const maxActualScore = testScoreData.length > 0 
+    ? Math.max(...testScoreData.map(t => t.score || 0), 1) // At least 1 to avoid division by zero
+    : 1;
   
   // Calculate dynamic graph height - make it larger for better visibility
   const getGraphHeight = () => {
     if (testScoreData.length === 0) return 400; // Default height
     
-    // Base height scales with maximum possible score
+    // Base height scales with maximum actual score
     const baseHeight = 400;
-    const scoreBasedHeight = Math.min(400 + (maxPossibleScore * 8), 600); // Scale up to 8px per score point
+    const scoreBasedHeight = Math.min(400 + (maxActualScore * 10), 600); // Scale up to 10px per score point
     return Math.max(baseHeight, scoreBasedHeight);
   };
 
   const graphHeight = getGraphHeight();
   
-  // Helper to get total bar height percentage based on maxScore
-  const getTotalBarHeight = (maxScore) => {
-    if (!maxScore || maxPossibleScore === 0) return 0;
-    // Calculate percentage based on maxScore relative to max possible score
-    return (maxScore / maxPossibleScore) * 100;
+  // Helper to get total bar height percentage based on ACTUAL SCORE (proportional scaling)
+  // This makes score 10 twice as tall as score 5, like the fruit chart example
+  const getTotalBarHeight = (score) => {
+    if (!score || maxActualScore === 0) return 10; // Minimum 10% for visibility
+    // Calculate percentage based on actual score relative to max actual score
+    const percentage = (score / maxActualScore) * 100;
+    return Math.max(percentage, 10); // Ensure minimum visibility
   };
   
-  // Helper to get score portion percentage
+  // Helper to get score portion percentage within the bar
+  // The colored portion represents the actual score
   const getScoreHeight = (score, maxScore) => {
     if (!score || !maxScore) return 0;
-    return (score / maxScore) * 100;
+    // The colored portion is always 100% of the bar (since bar height = score)
+    // But we show gray remainder up to maxScore for visual reference
+    return 100; // Full bar is colored since bar height represents actual score
+  };
+  
+  // Helper to get remaining portion (gray section) - shows potential up to maxScore
+  // Gray section is scaled proportionally but doesn't affect score comparison
+  const getRemainingHeight = (score, maxScore) => {
+    if (!score || !maxScore || score >= maxScore || maxActualScore === 0) return 0;
+    // Calculate remaining potential
+    const remaining = maxScore - score;
+    // Scale remaining relative to maxActualScore (same scale as colored portion)
+    const remainingBarHeight = (remaining / maxActualScore) * 100;
+    // Colored bar height (proportional to score)
+    const coloredBarHeight = getTotalBarHeight(score);
+    // Total visual height
+    const totalVisualHeight = coloredBarHeight + remainingBarHeight;
+    // Return gray as percentage of total
+    if (totalVisualHeight === 0) return 0;
+    return (remainingBarHeight / totalVisualHeight) * 100;
+  };
+  
+  // Helper to get total visual height (colored + gray)
+  const getTotalVisualHeight = (score, maxScore) => {
+    // Colored portion height (proportional to actual score - this is what matters for comparison)
+    const coloredHeight = getTotalBarHeight(score);
+    if (!score || !maxScore || score >= maxScore || maxActualScore === 0) {
+      return coloredHeight;
+    }
+    // Gray portion height (scaled the same way)
+    const remaining = maxScore - score;
+    const grayHeight = (remaining / maxActualScore) * 100;
+    return coloredHeight + grayHeight;
   };
 
   const getSeverityColor = (severity) => {
@@ -527,7 +563,7 @@ const Dashboard = () => {
                 {testScoreData.length > 0 && (
                   <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between pr-2 pointer-events-none">
                     {[0, 1, 2, 3, 4].map(i => {
-                      const scoreValue = Math.round((maxPossibleScore / 4) * (4 - i));
+                      const scoreValue = Math.round((maxActualScore / 4) * (4 - i));
                       return (
                         <div key={i} className={`text-xs font-mono ${textSecondary}`}>
                           {scoreValue}
@@ -551,9 +587,13 @@ const Dashboard = () => {
                   <div className="absolute inset-0 flex items-end justify-between px-6 gap-4 pl-12">
                     {testScoreData.map((testData, index) => {
                       const isLastBar = index === testScoreData.length - 1;
-                      const totalBarHeight = getTotalBarHeight(testData.maxScore);
-                      const scoreHeight = getScoreHeight(testData.score, testData.maxScore);
-                      const remainingHeight = 100 - scoreHeight;
+                      // Total visual height (colored + gray) - proportional to maxScore for visual reference
+                      const totalVisualHeight = getTotalVisualHeight(testData.score, testData.maxScore);
+                      // Colored portion height (proportional to actual score)
+                      const coloredHeight = getTotalBarHeight(testData.score);
+                      // Calculate percentages for colored and gray portions
+                      const scoreHeight = totalVisualHeight > 0 ? (coloredHeight / totalVisualHeight) * 100 : 100;
+                      const remainingHeight = getRemainingHeight(testData.score, testData.maxScore);
                       
                       // Create gradient for last bar (most recent)
                       const barGradient = isLastBar 
@@ -566,7 +606,7 @@ const Dashboard = () => {
                           <div 
                             className="w-full relative transition-all duration-300"
                             style={{
-                              height: `${totalBarHeight}%`,
+                              height: `${totalVisualHeight}%`,
                               minHeight: '80px',
                               maxHeight: '100%'
                             }}
