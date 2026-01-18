@@ -9,13 +9,13 @@ const Navbar = () => {
   const [activeUsers, setActiveUsers] = useState(247);
 
   useEffect(() => {
-    // Simulate active users count (can be connected to real API later)
+    // Simulate active users count
     const interval = setInterval(() => {
       setActiveUsers(prev => {
-        const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
+        const change = Math.floor(Math.random() * 5) - 2;
         return Math.max(200, Math.min(300, prev + change));
       });
-    }, 30000); // Update every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -36,109 +36,128 @@ const Navbar = () => {
     { path: '/forum', label: 'Community' },
   ];
 
-  const userName = user?.anonymous_id || user?.name || 'User';
+  const userName = user?.anonymous_id || user?.name || 'Alex User';
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (
-    <nav className="bg-gray-900 border-b border-gray-800 shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Left Section - Logo and Navigation */}
-          <div className="flex items-center space-x-8">
-            {/* Logo */}
-            <Link to={isAdmin ? '/admin/dashboard' : '/dashboard'} className="flex items-center space-x-2 group">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg flex items-center justify-center transform group-hover:scale-110 transition-transform shadow-lg">
-                <span className="text-white font-bold text-lg">D</span>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                DPIS PRO
-              </span>
-            </Link>
-
-            {/* Navigation Links */}
-            {!isAdmin && (
-              <div className="hidden md:flex items-center space-x-1">
-                {studentNavItems.map(item => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      location.pathname === item.path
-                        ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
-                        : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Right Section - Status Indicators and User */}
-          <div className="flex items-center space-x-6">
-            {/* System Status Indicators - Hidden on small screens */}
-            <div className="hidden lg:flex items-center space-x-4 text-xs">
-              <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-500/20 border border-green-500/50 rounded-full">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-400 font-semibold">SYSTEM: ALL SYSTEMS OPERATIONAL</span>
-              </div>
-              
-              <div className="flex items-center space-x-2 px-3 py-1.5 bg-blue-500/20 border border-blue-500/50 rounded-full">
-                <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M11.3 1.046a1 1 0 01.714 0l7 2.5A1 1 0 0119 4.5v7a1 1 0 01-.986 1.05L17 13v-2a1 1 0 00-1-1H4a1 1 0 00-1 1v2l-1.014.05A1 1 0 011 11.5v-7a1 1 0 01.986-.954l7-2.5zM4 11l1 2h10l1-2V6H4v5zm9-5h2v2h-2V6z" clipRule="evenodd" />
-                </svg>
-                <span className="text-blue-400 font-semibold">LIVE: {activeUsers} ACTIVE USERS ONLINE</span>
-              </div>
-
-              <div className="flex items-center space-x-2 px-3 py-1.5 bg-purple-500/20 border border-purple-500/50 rounded-full">
-                <svg className="w-4 h-4 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
-                </svg>
-                <span className="text-purple-400 font-semibold">NEW AI MODEL V4.2 DEPLOYED</span>
-              </div>
-            </div>
-
-            {/* Notification Bell */}
-            <button
-              className="relative p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-colors"
-              aria-label="Notifications"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {/* Notification badge */}
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-
-            {/* User Profile with Premium Badge */}
-            <div className="flex items-center space-x-3 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-lg">
-                  {userInitial}
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-sm font-semibold text-gray-200">
-                    {userName.toUpperCase()} 
-                    <span className="ml-2 px-2 py-0.5 bg-gradient-to-r from-purple-600 to-blue-600 text-xs rounded-full font-bold">
-                      PREMIUM ACCESS
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-colors duration-200"
-            >
-              Logout
-            </button>
+    <>
+      <header className="fixed w-full top-0 z-50 border-b border-white/10 bg-gray-900/95 backdrop-blur-md">
+        {/* Scrolling Status Bar */}
+        <div className="bg-gradient-to-r from-purple-600/20 via-blue-900/20 to-purple-600/20 border-b border-white/5 h-8 flex items-center overflow-hidden">
+          <div className="whitespace-nowrap animate-scroll-text text-xs font-mono text-cyan-400 flex items-center gap-8">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              SYSTEM: ALL SYSTEMS OPERATIONAL
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="material-icons-outlined text-sm">bolt</span>
+              LIVE: {activeUsers} ACTIVE USERS ONLINE
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="material-icons-outlined text-sm">psychology</span>
+              NEW AI MODEL V4.2 DEPLOYED
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="material-icons-outlined text-sm">event</span>
+              UPCOMING WEBINAR: MANAGING STRESS - 2PM EST
+            </span>
           </div>
         </div>
-      </div>
-    </nav>
+
+        {/* Main Navbar */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Left Section - Logo and Navigation */}
+            <div className="flex items-center space-x-8">
+              {/* Logo */}
+              <Link 
+                to={isAdmin ? '/admin/dashboard' : '/dashboard'} 
+                className="flex-shrink-0 flex items-center space-x-3 group cursor-pointer"
+              >
+                <div className="relative w-10 h-10">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-cyan-500 rounded-lg transform rotate-3 group-hover:rotate-12 transition-transform duration-500 opacity-80 blur-sm"></div>
+                  <div className="relative bg-gray-900 border border-white/20 rounded-lg h-full w-full flex items-center justify-center transform group-hover:scale-105 transition-transform duration-300 shadow-lg shadow-purple-500/30 z-10">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"></path>
+                    </svg>
+                  </div>
+                </div>
+                <span className="text-2xl font-bold tracking-tight text-white group-hover:text-purple-400 transition-all duration-300">
+                  DPIS <span className="text-purple-500 text-sm font-light tracking-widest align-top opacity-70">PRO</span>
+                </span>
+              </Link>
+
+              {/* Navigation Links */}
+              {!isAdmin && (
+                <div className="hidden md:block ml-12">
+                  <nav className="flex space-x-1">
+                    {studentNavItems.map(item => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        className={`relative px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                          location.pathname === item.path
+                            ? 'text-white bg-white/10 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {item.label}
+                        {location.pathname === item.path && (
+                          <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-purple-500 rounded-full"></span>
+                        )}
+                      </Link>
+                    ))}
+                  </nav>
+                </div>
+              )}
+            </div>
+
+            {/* Right Section - Notifications and User */}
+            <div className="flex items-center space-x-6">
+              {/* Notification Bell */}
+              <button
+                className="text-gray-400 hover:text-white transition-colors relative p-2"
+                aria-label="Notifications"
+              >
+                <span className="material-icons-outlined">notifications</span>
+                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-gray-900"></span>
+              </button>
+
+              {/* User Profile */}
+              <div className="flex items-center space-x-3 pl-6 border-l border-white/10">
+                <div className="flex flex-col text-right hidden sm:block">
+                  <span className="text-sm font-semibold text-white">{userName}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-cyan-400">Premium Access</span>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-600 to-pink-500 p-[2px]">
+                  <div className="h-full w-full rounded-full bg-gray-900 flex items-center justify-center overflow-hidden">
+                    <span className="text-white font-semibold text-sm">{userInitial}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-colors duration-200"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <style>{`
+        @keyframes scroll-text {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        .animate-scroll-text {
+          animation: scroll-text 20s linear infinite;
+        }
+      `}</style>
+    </>
   );
 };
 
