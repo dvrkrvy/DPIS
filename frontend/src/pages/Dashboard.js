@@ -11,11 +11,15 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
   const [testResults, setTestResults] = useState([]);
+  const [testHistory, setTestHistory] = useState([]); // For mental resilience graph
   const [loading, setLoading] = useState(true);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [emergencyContacts, setEmergencyContacts] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
     fetchTestResults();
+    fetchTestHistory();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -53,6 +57,36 @@ const Dashboard = () => {
     }
   };
 
+  const fetchTestHistory = async () => {
+    try {
+      const response = await api.get('/api/screening/history', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTestHistory(response.data.history || []);
+    } catch (error) {
+      console.error('Failed to load test history:', error);
+    }
+  };
+
+  const handleEmergencyClick = async () => {
+    try {
+      const response = await api.get('/api/emergency/contacts', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEmergencyContacts(response.data.contacts);
+      setShowEmergencyModal(true);
+    } catch (error) {
+      console.error('Failed to fetch emergency contacts:', error);
+      // Show default contacts even if API fails
+      setEmergencyContacts({
+        hotline: '988',
+        institutionEmail: 'support@dpis.edu',
+        institutionPhone: '1-800-273-8255'
+      });
+      setShowEmergencyModal(true);
+    }
+  };
+
   if (loading) {
     return (
       <div className={`flex items-center justify-center min-h-screen transition-colors ${
@@ -78,17 +112,21 @@ const Dashboard = () => {
     );
   }
 
-  // Get username properly
+  // Get username from database (user enters this when logging in)
   const getUserDisplayName = () => {
+    // Priority: username (from database login) > name > anonymous_id
+    if (user?.username) {
+      return user.username;
+    }
+    if (user?.name) {
+      return user.name;
+    }
     if (user?.anonymous_id) {
       const id = user.anonymous_id;
       if (id.length > 12) {
         return id.substring(0, 8) + '...';
       }
       return id;
-    }
-    if (user?.name) {
-      return user.name;
     }
     return 'User';
   };
@@ -98,7 +136,6 @@ const Dashboard = () => {
   const pendingCount = dashboardData.pendingAssessments?.count || 2;
   const completionPercentage = dashboardData.pendingAssessments?.completionPercentage || 75;
   const newResourcesCount = dashboardData.library?.newResourcesCount || 0;
-  const trends = dashboardData.mentalResilienceTrends || [];
   const dailyInsight = dashboardData.dailyInsight || { quote: "The only journey is the one within.", author: "— Rainer Maria Rilke" };
   
   // Format recent activities
@@ -132,24 +169,75 @@ const Dashboard = () => {
     ];
   }
 
-  // Format trends for chart
-  const monthNames = ['AUG', 'SEP', 'OCT', 'NOV', 'DEC', 'JAN'];
-  const trendValues = trends.length > 0 
-    ? trends.map(t => Math.round(t.score || 0))
-    : [40, 50, 60, 65, 70, 90]; // Default trend data
+  // Process test history for graph - get last 5 test scores
+  const processTestScores = () => {
+    // Get last 5 test results sorted by date (most recent first)
+    const lastFiveTests = [...testHistory]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 5)
+      .reverse(); // Reverse to show oldest to newest
 
-  const trendData = monthNames.map((month, index) => ({
-    month,
-    value: trendValues[index] || 0,
-    height: trendValues[index] || 0
-  }));
+    if (lastFiveTests.length === 0) {
+      return [];
+    }
 
-  // Calculate bar heights (normalized to 0-100)
-  const maxValue = Math.max(...trendValues, 100);
-  const barHeights = trendData.map(item => ({
-    ...item,
-    heightPercent: (item.value / maxValue) * 100
-  }));
+    return lastFiveTests.map((test, index) => {
+      const testType = test.test_type?.toUpperCase();
+      const testDate = new Date(test.created_at);
+      
+      // Format date for display
+      const dateStr = testDate.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+
+      // Get max score for the test type
+      const maxScore = testType === 'PHQ9' ? 27 : 
+                      testType === 'GAD7' ? 21 : 
+                      testType === 'GHQ' ? 12 : 27;
+
+      return {
+        id: test.id || index,
+        testType,
+        score: test.score,
+        date: dateStr,
+        fullDate: testDate,
+        maxScore,
+        color: testType === 'PHQ9' ? '#6366f1' : // Indigo
+               testType === 'GAD7' ? '#0ea5e9' : // Sky blue
+               testType === 'GHQ' ? '#8b5cf6' : '#6b7280', // Purple or gray
+        label: testType === 'PHQ9' ? 'PHQ-9' :
+               testType === 'GAD7' ? 'GAD-7' :
+               testType === 'GHQ' ? 'GHQ-12' : testType
+      };
+    });
+  };
+
+  const testScoreData = processTestScores();
+  
+  // Calculate dynamic graph height based on maximum score
+  const getGraphHeight = () => {
+    if (testScoreData.length === 0) return 256; // Default height
+    
+    // Find the maximum score and maxScore across all tests
+    const maxActualScore = Math.max(...testScoreData.map(t => t.score || 0));
+    const maxPossibleScore = Math.max(...testScoreData.map(t => t.maxScore || 27));
+    
+    // Calculate height: base height + proportional height based on max score
+    // Minimum 256px, scales up to 400px based on score ratio
+    const scoreRatio = maxActualScore / maxPossibleScore;
+    const baseHeight = 256;
+    const additionalHeight = scoreRatio * 144; // Up to 144px additional
+    return Math.max(baseHeight, Math.min(baseHeight + additionalHeight, 400));
+  };
+
+  const graphHeight = getGraphHeight();
+  
+  // Helper to get bar height percentage
+  const getBarHeight = (score, maxScore) => {
+    if (!score || !maxScore) return 0;
+    return (score / maxScore) * 100;
+  };
 
   const getSeverityColor = (severity) => {
     switch (severity) {
@@ -382,7 +470,7 @@ const Dashboard = () => {
                 { icon: 'forum', label: 'Community', color: 'green', route: '/forum' },
                 { icon: 'calendar', label: 'Schedule', color: 'orange', route: '/booking' },
                 { icon: 'smart_toy', label: 'AI Chat', color: 'pink', route: '/ai-chat' },
-                { icon: 'insights', label: 'Trends', color: 'indigo', route: '/progress' }
+                { icon: 'menu_book', label: 'Resources', color: 'indigo', route: '/resources' }
               ].map((item, index) => (
                 <button
                   key={item.label}
@@ -399,6 +487,7 @@ const Dashboard = () => {
                       {item.icon === 'forum' && <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />}
                       {item.icon === 'calendar' && <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />}
                       {item.icon === 'smart_toy' && <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />}
+                      {item.icon === 'menu_book' && <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />}
                       {item.icon === 'insights' && <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />}
                     </svg>
                   </div>
@@ -407,62 +496,98 @@ const Dashboard = () => {
               ))}
             </div>
 
-            {/* Mental Resilience Trends */}
+            {/* Last 5 Test Scores Graph */}
             <div className={`reveal-up delay-400 ${cardBg} ${cardBorder} rounded-2xl p-6 shadow-lg border`}>
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h3 className={`text-lg font-semibold ${textMain}`}>Mental Resilience Trends</h3>
-                  <p className={`text-xs ${textSecondary}`}>Last 6 Months Data</p>
+                  <h3 className={`text-lg font-semibold ${textMain}`}>Recent Test Scores</h3>
+                  <p className={`text-xs ${textSecondary}`}>Last 5 Screening Test Results</p>
                 </div>
                 <button
-                  onClick={() => navigate('/progress')}
+                  onClick={() => navigate('/screening')}
                   className={`text-xs border rounded px-3 py-1 transition-colors ${
                     darkMode 
                       ? 'border-white/10 hover:bg-white/5 text-gray-400' 
                       : 'border-gray-300 hover:bg-gray-100 text-gray-600'
                   }`}
                 >
-                  Export Report
+                  View All
                 </button>
               </div>
-              <div className="relative h-64 w-full flex items-end justify-between px-2 gap-2">
+              
+              {/* Test Scores Graph */}
+              <div className="relative w-full" style={{ height: `${graphHeight}px` }}>
                 {/* Grid lines */}
                 <div className={`absolute inset-0 flex flex-col justify-between pointer-events-none pb-0 opacity-20 ${
                   darkMode ? '' : 'border-gray-300'
                 }`}>
-                  {[0, 1, 2, 3].map(i => (
+                  {[0, 1, 2, 3, 4].map(i => (
                     <div key={i} className={`w-full border-t border-dashed ${darkMode ? 'border-white' : 'border-gray-300'}`}></div>
                   ))}
                 </div>
-                {/* Bars */}
-                {barHeights.map((item, index) => (
-                  <div key={item.month} className="flex-1 flex flex-col justify-end items-center gap-2 group cursor-pointer">
-                    <div 
-                      className={`w-full max-w-[40px] rounded-t-sm transition-all duration-500 group-hover:opacity-90 relative overflow-hidden ${
-                        darkMode 
-                          ? 'bg-white/5 group-hover:bg-white/10' 
-                          : 'bg-gray-200 group-hover:bg-gray-300'
-                      } ${index === barHeights.length - 1 ? 'shadow-lg shadow-purple-500/30' : ''}`}
-                      style={{ height: `${Math.max(item.heightPercent, 20)}%` }}
-                    >
-                      <div 
-                        className={`absolute bottom-0 w-full ${
-                          index === barHeights.length - 1 
-                            ? 'bg-gradient-to-t from-purple-600 to-cyan-500' 
-                            : `bg-purple-600/70`
-                        } transition-all group-hover:opacity-90`}
-                        style={{ height: `${item.heightPercent}%` }}
-                      ></div>
-                    </div>
-                    <span className={`text-[10px] font-mono ${
-                      index === barHeights.length - 1 
-                        ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
-                        : textSecondary
-                    }`}>
-                      {item.month}
-                    </span>
+                
+                {/* Graph Bars - Individual test scores */}
+                {testScoreData.length > 0 ? (
+                  <div className="absolute inset-0 flex items-end justify-between px-4 gap-2">
+                    {testScoreData.map((testData, index) => {
+                      const barHeight = Math.max(getBarHeight(testData.score, testData.maxScore), 5);
+                      
+                      return (
+                        <div key={testData.id} className="flex-1 flex flex-col justify-end items-center gap-2 group relative max-w-[80px]">
+                          <div 
+                            className="w-full rounded-t-sm transition-all duration-300 group-hover:opacity-100 relative border-2"
+                            style={{
+                              height: `${barHeight}%`,
+                              backgroundColor: testData.color,
+                              borderColor: `${testData.color}80`,
+                              minHeight: '30px',
+                              maxHeight: '100%'
+                            }}
+                            title={`${testData.label}: ${testData.score}/${testData.maxScore}`}
+                          >
+                            {/* Score label on hover */}
+                            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-white px-2 py-1 rounded whitespace-nowrap z-10"
+                                 style={{ backgroundColor: testData.color }}>
+                              {testData.score}
+                            </div>
+                            {/* Test type label inside bar */}
+                            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-[9px] font-bold text-white opacity-90">
+                              {testData.label}
+                            </div>
+                          </div>
+                          {/* Date label */}
+                          <span className={`text-[10px] font-mono mt-1 text-center ${
+                            index === testScoreData.length - 1 
+                              ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
+                              : textSecondary
+                          }`}>
+                            {testData.date}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className={`text-sm ${textSecondary}`}>No test scores available</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Legend */}
+              <div className="flex justify-center gap-6 mt-6 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-indigo-500"></div>
+                  <span className={`text-xs ${textSecondary}`}>PHQ-9 (Depression)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-sky-500"></div>
+                  <span className={`text-xs ${textSecondary}`}>GAD-7 (Anxiety)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-purple-500"></div>
+                  <span className={`text-xs ${textSecondary}`}>GHQ-12 (General Health)</span>
+                </div>
               </div>
             </div>
           </div>
@@ -618,7 +743,7 @@ const Dashboard = () => {
               ? 'bg-red-600/10 border-red-500/50 text-red-500 hover:bg-red-600 hover:text-white' 
               : 'bg-red-50 border-red-300 text-red-600 hover:bg-red-600 hover:text-white'
           }`}
-          onClick={() => navigate('/emergency')}
+          onClick={handleEmergencyClick}
           title="Emergency Support"
         >
           <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -626,6 +751,60 @@ const Dashboard = () => {
           </svg>
         </button>
       </div>
+
+      {/* Emergency Modal */}
+      {showEmergencyModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4" 
+          onClick={() => setShowEmergencyModal(false)}
+        >
+          <div 
+            className={`${cardBg} ${cardBorder} rounded-xl p-6 max-w-md w-full shadow-2xl border`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className={`text-2xl font-bold text-red-600 dark:text-red-400 mb-4`}>🆘 Emergency Support</h2>
+            <p className={`mb-4 ${textSecondary}`}>
+              If you are in immediate danger, please call <strong className="text-red-600 dark:text-red-400">911</strong> or your local emergency services.
+            </p>
+            <div className="space-y-4 mb-6">
+              <div className={`p-4 rounded-lg border ${
+                darkMode ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'
+              }`}>
+                <strong className={`block mb-1 ${textMain}`}>National Suicide Prevention Lifeline:</strong>
+                <a href="tel:988" className="text-red-600 dark:text-red-400 font-semibold text-lg hover:underline">988</a>
+              </div>
+              <div className={`p-4 rounded-lg border ${
+                darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'
+              }`}>
+                <strong className={`block mb-1 ${textMain}`}>Crisis Text Line:</strong>
+                <p className="text-blue-600 dark:text-blue-400 font-semibold">Text HOME to 741741</p>
+              </div>
+              {emergencyContacts?.institutionEmail && (
+                <div className={`p-4 rounded-lg border ${
+                  darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <strong className={`block mb-1 ${textMain}`}>Institution Email:</strong>
+                  <a href={`mailto:${emergencyContacts.institutionEmail}`} className="text-purple-600 dark:text-purple-400 font-semibold hover:underline">{emergencyContacts.institutionEmail}</a>
+                </div>
+              )}
+              {emergencyContacts?.institutionPhone && (
+                <div className={`p-4 rounded-lg border ${
+                  darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <strong className={`block mb-1 ${textMain}`}>Institution Phone:</strong>
+                  <a href={`tel:${emergencyContacts.institutionPhone}`} className="text-purple-600 dark:text-purple-400 font-semibold hover:underline">{emergencyContacts.institutionPhone}</a>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setShowEmergencyModal(false)}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Background gradient effects */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-hidden">

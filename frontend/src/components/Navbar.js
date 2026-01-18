@@ -26,18 +26,21 @@ const Navbar = () => {
     { path: '/booking', label: 'Booking' },
   ];
 
-  // Get username properly - use anonymous_id or name, format nicely
+  // Get username from database (user enters this when logging in)
   const getUserDisplayName = () => {
+    // Priority: username (from database login) > name > anonymous_id
+    if (user?.username) {
+      return user.username;
+    }
+    if (user?.name) {
+      return user.name;
+    }
     if (user?.anonymous_id) {
-      // If anonymous_id is very long, truncate it nicely
       const id = user.anonymous_id;
       if (id.length > 12) {
         return id.substring(0, 8) + '...';
       }
       return id;
-    }
-    if (user?.name) {
-      return user.name;
     }
     return 'User';
   };
@@ -151,11 +154,6 @@ const Navbar = () => {
                   darkMode ? 'text-white' : 'text-gray-900'
                 }`}>
                   {userName}
-                </span>
-                <span className={`text-[10px] uppercase tracking-wider ${
-                  darkMode ? 'text-cyan-400' : 'text-cyan-600'
-                }`}>
-                  Premium Access
                 </span>
               </div>
               <div className={`h-10 w-10 rounded-full bg-gradient-to-r p-[2px] ${
