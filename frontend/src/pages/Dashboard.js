@@ -508,7 +508,13 @@ const Dashboard = () => {
                   <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between border-r pr-2"
                     style={{ borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
                     {testScoreData.length > 0 && [0, 1, 2, 3, 4].map(i => {
-                      const scoreValue = Math.round((maxActualScore / 4) * (4 - i));
+                      // Y-axis labels: 0 (bottom), 25%, 50%, 75%, maxActualScore (top)
+                      // Top label should be exact maxActualScore, others evenly spaced
+                      const scoreValue = i === 0 
+                        ? maxActualScore  // Top: exact max score
+                        : i === 4 
+                          ? 0  // Bottom: 0
+                          : Math.round((maxActualScore / 4) * (4 - i)); // Middle values
                       return (
                         <div key={i} className={`text-xs font-medium ${textSecondary} text-right`}>
                           {scoreValue}
@@ -537,13 +543,15 @@ const Dashboard = () => {
                         {testScoreData.map((testData, index) => {
                           const isLastBar = index === testScoreData.length - 1;
                           // Calculate bar height as percentage of graph area
-                          // Y-axis shows: 0 (bottom), maxActualScore/4, maxActualScore/2, 3*maxActualScore/4, maxActualScore (top)
-                          // So if score = maxActualScore/2, bar should reach 50% height (middle grid line)
+                          // Y-axis top = maxActualScore, bottom = 0
+                          // Bar height = (score / maxActualScore) * 100%
+                          // If score = maxActualScore, bar should reach 100% (top grid line)
+                          // If score = 0, bar should be at 0% (bottom)
                           const barHeightPercent = maxActualScore > 0 
                             ? (testData.score / maxActualScore) * 100 
                             : 0;
-                          // Ensure minimum visibility but don't override the calculation
-                          const barHeight = testData.score === 0 ? 2 : Math.max(barHeightPercent, 3);
+                          // For score 0, show a tiny visible bar, otherwise use exact percentage
+                          const barHeight = testData.score === 0 ? 2 : barHeightPercent;
                           
                           return (
                             <div 
@@ -558,7 +566,7 @@ const Dashboard = () => {
                                 style={{
                                   height: `${barHeight}%`,
                                   backgroundColor: testData.color,
-                                  minHeight: testData.score === 0 ? '4px' : '6px',
+                                  minHeight: testData.score === 0 ? '4px' : '0px', // No minHeight for non-zero scores
                                   boxShadow: isLastBar 
                                     ? `0 0 15px ${testData.color}50`
                                     : `0 2px 4px rgba(0,0,0,0.1)`
