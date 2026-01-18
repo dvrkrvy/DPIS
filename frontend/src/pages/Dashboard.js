@@ -221,65 +221,17 @@ const Dashboard = () => {
     ? Math.max(...testScoreData.map(t => t.score || 0), 1) // At least 1 to avoid division by zero
     : 1;
   
-  // Calculate dynamic graph height - make it larger for better visibility
-  const getGraphHeight = () => {
-    if (testScoreData.length === 0) return 400; // Default height
-    
-    // Base height scales with maximum actual score
-    const baseHeight = 400;
-    const scoreBasedHeight = Math.min(400 + (maxActualScore * 10), 600); // Scale up to 10px per score point
-    return Math.max(baseHeight, scoreBasedHeight);
-  };
-
-  const graphHeight = getGraphHeight();
+  // Standard graph height - fixed for consistency
+  const graphHeight = 350;
   
-  // Helper to get colored portion height percentage - scales by ACTUAL SCORE
+  // Helper to calculate bar height percentage based on actual score
   // Score 10 will be twice as tall as score 5
-  const getColoredHeight = (score) => {
+  const getBarHeight = (score) => {
     if (maxActualScore === 0) return 0;
-    if (score === 0) return 0; // No colored portion if score is 0
+    if (score === 0) return 2; // Small visible bar for score 0
     // Calculate percentage based on actual score relative to max actual score
     const percentage = (score / maxActualScore) * 100;
-    return Math.max(percentage, 5); // Minimum 5% for visibility (except when score is 0)
-  };
-  
-  // Helper to get gray portion height percentage - scales by remaining score
-  const getGrayHeight = (score, maxScore) => {
-    if (!maxScore || maxActualScore === 0) return 0;
-    // Calculate remaining potential
-    const remaining = maxScore - score;
-    if (remaining <= 0) return 0;
-    // Scale remaining relative to maxActualScore (same scale as colored portion)
-    const percentage = (remaining / maxActualScore) * 100;
-    return percentage;
-  };
-  
-  // Helper to get total visual height (colored + gray)
-  const getTotalVisualHeight = (score, maxScore) => {
-    const coloredHeight = getColoredHeight(score);
-    const grayHeight = getGrayHeight(score, maxScore);
-    const total = coloredHeight + grayHeight;
-    // If score is 0, ensure we still show a bar (at least gray portion)
-    if (score === 0 && grayHeight > 0) {
-      return Math.max(grayHeight, 10); // Minimum 10% for visibility
-    }
-    return Math.max(total, 10); // Minimum 10% for visibility
-  };
-  
-  // Helper to get colored portion as percentage of total bar
-  const getColoredPercentage = (score, maxScore) => {
-    const total = getTotalVisualHeight(score, maxScore);
-    if (total === 0) return 0;
-    const colored = getColoredHeight(score);
-    return (colored / total) * 100;
-  };
-  
-  // Helper to get gray portion as percentage of total bar
-  const getGrayPercentage = (score, maxScore) => {
-    const total = getTotalVisualHeight(score, maxScore);
-    if (total === 0) return 100; // If no colored portion, show full gray
-    const gray = getGrayHeight(score, maxScore);
-    return (gray / total) * 100;
+    return Math.max(percentage, 2); // Minimum 2% for visibility
   };
 
   const getSeverityColor = (severity) => {
@@ -558,141 +510,110 @@ const Dashboard = () => {
                 </button>
               </div>
               
-              {/* Test Scores Graph */}
-              <div className="relative w-full" style={{ height: `${graphHeight}px` }}>
-                {/* Y-axis labels */}
-                {testScoreData.length > 0 && (
-                  <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between pr-2 pointer-events-none">
-                    {[0, 1, 2, 3, 4].map(i => {
+              {/* Test Scores Graph - Standard Bar Chart */}
+              <div className="w-full">
+                {/* Graph Container */}
+                <div className="relative w-full" style={{ height: `${graphHeight}px` }}>
+                  {/* Y-axis */}
+                  <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between border-r pr-2"
+                    style={{ borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+                    {testScoreData.length > 0 && [0, 1, 2, 3, 4].map(i => {
                       const scoreValue = Math.round((maxActualScore / 4) * (4 - i));
                       return (
-                        <div key={i} className={`text-xs font-mono ${textSecondary}`}>
+                        <div key={i} className={`text-xs font-medium ${textSecondary} text-right`}>
                           {scoreValue}
                         </div>
                       );
                     })}
                   </div>
-                )}
-                
-                {/* Grid lines */}
-                <div className={`absolute inset-0 flex flex-col justify-between pointer-events-none pb-0 opacity-20 pl-8 ${
-                  darkMode ? '' : 'border-gray-300'
-                }`}>
-                  {[0, 1, 2, 3, 4].map(i => (
-                    <div key={i} className={`w-full border-t border-dashed ${darkMode ? 'border-white' : 'border-gray-300'}`}></div>
-                  ))}
-                </div>
-                
-                {/* Graph Bars - Individual test scores */}
-                {testScoreData.length > 0 ? (
-                  <div className="absolute inset-0 flex items-end justify-between px-6 gap-4 pl-12">
-                    {testScoreData.map((testData, index) => {
-                      const isLastBar = index === testScoreData.length - 1;
-                      // Total visual height (colored + gray)
-                      const totalVisualHeight = getTotalVisualHeight(testData.score, testData.maxScore);
-                      // Calculate percentages for colored and gray portions
-                      const scoreHeight = getColoredPercentage(testData.score, testData.maxScore);
-                      const remainingHeight = getGrayPercentage(testData.score, testData.maxScore);
-                      
-                      // Create gradient for last bar (most recent)
-                      const barGradient = isLastBar 
-                        ? `linear-gradient(to top, ${testData.color}, #06b6d4)` // Blue to cyan gradient
-                        : testData.color;
-                      
-                      return (
-                        <div key={testData.id} className="flex-1 flex flex-col justify-end items-center gap-2 group relative max-w-[100px]">
-                          {/* Complete Bar Container */}
-                          <div 
-                            className="w-full relative transition-all duration-300"
-                            style={{
-                              height: `${totalVisualHeight}%`,
-                              maxHeight: '100%'
-                            }}
-                          >
-                            {/* Dark Gray Remaining Portion (Top) */}
-                            {remainingHeight > 0 && (
+                  
+                  {/* Graph Area */}
+                  <div className="ml-14 h-full relative">
+                    {/* Grid Lines */}
+                    <div className="absolute inset-0 flex flex-col justify-between">
+                      {[0, 1, 2, 3, 4].map(i => (
+                        <div 
+                          key={i} 
+                          className={`w-full border-t border-dashed ${
+                            darkMode ? 'border-white/10' : 'border-gray-300'
+                          }`}
+                        ></div>
+                      ))}
+                    </div>
+                    
+                    {/* Bars */}
+                    {testScoreData.length > 0 ? (
+                      <div className="absolute inset-0 flex items-end justify-around gap-3 px-4">
+                        {testScoreData.map((testData, index) => {
+                          const isLastBar = index === testScoreData.length - 1;
+                          const barHeight = getBarHeight(testData.score);
+                          
+                          return (
+                            <div 
+                              key={testData.id} 
+                              className="flex-1 flex flex-col items-center justify-end gap-2 group relative max-w-[120px]"
+                            >
+                              {/* Bar */}
                               <div 
-                                className="w-full absolute top-0 rounded-t-lg relative"
-                                style={{
-                                  height: `${remainingHeight}%`,
-                                  backgroundColor: darkMode ? 'rgba(75, 85, 99, 0.4)' : 'rgba(156, 163, 175, 0.3)',
-                                  borderTop: `2px solid ${darkMode ? 'rgba(75, 85, 99, 0.6)' : 'rgba(156, 163, 175, 0.5)'}`,
-                                  borderLeft: `2px solid ${darkMode ? 'rgba(75, 85, 99, 0.6)' : 'rgba(156, 163, 175, 0.5)'}`,
-                                  borderRight: `2px solid ${darkMode ? 'rgba(75, 85, 99, 0.6)' : 'rgba(156, 163, 175, 0.5)'}`
-                                }}
-                              >
-                                {/* Show label in gray bar if score is 0 */}
-                                {testData.score === 0 && (
-                                  <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-400 opacity-95 drop-shadow-lg">
-                                    {testData.label}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
-                            {/* Colored Score Portion (Bottom) */}
-                            {scoreHeight > 0 && (
-                              <div 
-                                className={`w-full absolute bottom-0 rounded-b-lg transition-all duration-300 relative border-2 shadow-lg ${
-                                  isLastBar ? 'ring-2 ring-cyan-400/50 ring-offset-2 ring-offset-transparent' : ''
+                                className={`w-full rounded-t transition-all duration-300 hover:opacity-90 ${
+                                  isLastBar ? 'ring-2 ring-cyan-400/50 shadow-lg' : ''
                                 }`}
                                 style={{
-                                  height: `${scoreHeight}%`,
-                                  background: barGradient,
-                                  borderColor: `${testData.color}80`,
+                                  height: `${barHeight}%`,
+                                  backgroundColor: testData.color,
+                                  minHeight: testData.score === 0 ? '4px' : '8px',
                                   boxShadow: isLastBar 
-                                    ? `0 0 20px ${testData.color}40, 0 0 40px ${testData.color}20`
-                                    : undefined
+                                    ? `0 0 15px ${testData.color}50`
+                                    : `0 2px 4px rgba(0,0,0,0.1)`
                                 }}
                                 title={`${testData.label}: ${testData.score}/${testData.maxScore}`}
                               >
-                                {/* Test type label inside bar */}
-                                <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-bold text-white opacity-95 drop-shadow-lg">
-                                  {testData.label}
+                                {/* Score label on hover */}
+                                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold text-white px-2 py-1 rounded whitespace-nowrap z-10"
+                                     style={{ backgroundColor: testData.color }}>
+                                  {testData.score}
                                 </div>
                               </div>
-                            )}
-                            
-                            {/* Score label - always visible above bar */}
-                            <div 
-                              className="absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-100 transition-opacity text-sm font-bold text-white px-3 py-1.5 rounded-md shadow-lg whitespace-nowrap z-10"
-                              style={{ backgroundColor: testData.color }}
-                            >
-                              {testData.score}/{testData.maxScore}
+                              
+                              {/* X-axis Labels */}
+                              <div className="flex flex-col items-center gap-1 mt-2">
+                                <span className={`text-xs font-medium ${
+                                  isLastBar 
+                                    ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
+                                    : textSecondary
+                                }`}>
+                                  {testData.date}
+                                </span>
+                                <span className={`text-[10px] ${textSecondary}`}>
+                                  {testData.label}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                          
-                          {/* Date label */}
-                          <span className={`text-[10px] font-mono mt-1 text-center ${
-                            isLastBar 
-                              ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
-                              : textSecondary
-                          }`}>
-                            {testData.date}
-                          </span>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <p className={`text-sm ${textSecondary}`}>No test scores available</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <p className={`text-sm ${textSecondary}`}>No test scores available</p>
-                  </div>
-                )}
+                </div>
               </div>
               
               {/* Legend */}
-              <div className="flex justify-center gap-6 mt-6 flex-wrap">
+              <div className="flex justify-center gap-6 mt-6 pt-4 border-t"
+                style={{ borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-indigo-500"></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: '#6366f1' }}></div>
                   <span className={`text-xs ${textSecondary}`}>PHQ-9 (Depression)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-sky-500"></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: '#0ea5e9' }}></div>
                   <span className={`text-xs ${textSecondary}`}>GAD-7 (Anxiety)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-purple-500"></div>
+                  <div className="w-4 h-4 rounded" style={{ backgroundColor: '#8b5cf6' }}></div>
                   <span className={`text-xs ${textSecondary}`}>GHQ-12 (General Health)</span>
                 </div>
               </div>
