@@ -223,16 +223,6 @@ const Dashboard = () => {
   
   // Standard graph height - fixed for consistency
   const graphHeight = 350;
-  
-  // Helper to calculate bar height percentage based on actual score
-  // Score 10 will be twice as tall as score 5
-  const getBarHeight = (score) => {
-    if (maxActualScore === 0) return 0;
-    if (score === 0) return 2; // Small visible bar for score 0
-    // Calculate percentage based on actual score relative to max actual score
-    const percentage = (score / maxActualScore) * 100;
-    return Math.max(percentage, 2); // Minimum 2% for visibility
-  };
 
   const getSeverityColor = (severity) => {
     switch (severity) {
@@ -528,27 +518,33 @@ const Dashboard = () => {
                   </div>
                   
                   {/* Graph Area */}
-                  <div className="ml-14 h-full relative">
-                    {/* Grid Lines */}
-                    <div className="absolute inset-0 flex flex-col justify-between">
-                      {[0, 1, 2, 3, 4].map(i => (
+                  <div className="ml-14 h-full relative pb-8">
+                    {/* Grid Lines - aligned with Y-axis values */}
+                    <div className="absolute inset-0 flex flex-col justify-between pb-0">
+                  {[0, 1, 2, 3, 4].map(i => (
                         <div 
                           key={i} 
                           className={`w-full border-t border-dashed ${
                             darkMode ? 'border-white/10' : 'border-gray-300'
                           }`}
                         ></div>
-                      ))}
-                    </div>
-                    
+                  ))}
+                </div>
+                
                     {/* Bars */}
-                    {testScoreData.length > 0 ? (
-                      <div className="absolute inset-0 flex items-end justify-around gap-3 px-4">
-                        {testScoreData.map((testData, index) => {
+                {testScoreData.length > 0 ? (
+                      <div className="absolute inset-0 flex items-end justify-around gap-3 px-4 pb-0">
+                    {testScoreData.map((testData, index) => {
                           const isLastBar = index === testScoreData.length - 1;
-                          const barHeight = getBarHeight(testData.score);
-                          
-                          return (
+                          // Calculate bar height as percentage - score 10 should be at 50% if max is 20
+                          // The Y-axis goes from 0 (bottom) to maxActualScore (top)
+                          // So bar height = (score / maxActualScore) * 100%
+                          const barHeightPercent = maxActualScore > 0 
+                            ? (testData.score / maxActualScore) * 100 
+                            : 0;
+                          const barHeight = Math.max(barHeightPercent, testData.score === 0 ? 2 : 5); // Minimum visibility
+                      
+                      return (
                             <div 
                               key={testData.id} 
                               className="flex-1 flex flex-col items-center justify-end gap-2 group relative max-w-[120px]"
@@ -558,45 +554,45 @@ const Dashboard = () => {
                                 className={`w-full rounded-t transition-all duration-300 hover:opacity-90 ${
                                   isLastBar ? 'ring-2 ring-cyan-400/50 shadow-lg' : ''
                                 }`}
-                                style={{
-                                  height: `${barHeight}%`,
-                                  backgroundColor: testData.color,
+                            style={{
+                              height: `${barHeight}%`,
+                              backgroundColor: testData.color,
                                   minHeight: testData.score === 0 ? '4px' : '8px',
                                   boxShadow: isLastBar 
                                     ? `0 0 15px ${testData.color}50`
                                     : `0 2px 4px rgba(0,0,0,0.1)`
-                                }}
-                                title={`${testData.label}: ${testData.score}/${testData.maxScore}`}
-                              >
-                                {/* Score label on hover */}
+                            }}
+                            title={`${testData.label}: ${testData.score}/${testData.maxScore}`}
+                          >
+                            {/* Score label on hover */}
                                 <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold text-white px-2 py-1 rounded whitespace-nowrap z-10"
-                                     style={{ backgroundColor: testData.color }}>
-                                  {testData.score}
-                                </div>
-                              </div>
+                                 style={{ backgroundColor: testData.color }}>
+                              {testData.score}
+                            </div>
+                            </div>
                               
                               {/* X-axis Labels */}
                               <div className="flex flex-col items-center gap-1 mt-2">
                                 <span className={`text-xs font-medium ${
                                   isLastBar 
-                                    ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
-                                    : textSecondary
-                                }`}>
-                                  {testData.date}
-                                </span>
+                              ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
+                              : textSecondary
+                          }`}>
+                            {testData.date}
+                          </span>
                                 <span className={`text-[10px] ${textSecondary}`}>
                                   {testData.label}
                                 </span>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <p className={`text-sm ${textSecondary}`}>No test scores available</p>
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <p className={`text-sm ${textSecondary}`}>No test scores available</p>
+                  </div>
+                )}
                   </div>
                 </div>
               </div>
