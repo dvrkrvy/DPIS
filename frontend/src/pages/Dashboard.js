@@ -215,30 +215,32 @@ const Dashboard = () => {
 
   const testScoreData = processTestScores();
   
-  // Calculate dynamic graph height based on maximum score - make it larger
+  // Find the maximum actual score across all tests for absolute scaling
+  const maxActualScore = testScoreData.length > 0 
+    ? Math.max(...testScoreData.map(t => t.score || 0), 1) // At least 1 to avoid division by zero
+    : 1;
+  
+  // Calculate dynamic graph height - make it larger for better visibility
   const getGraphHeight = () => {
-    if (testScoreData.length === 0) return 400; // Default height increased
+    if (testScoreData.length === 0) return 400; // Default height
     
-    // Find the maximum score and maxScore across all tests
-    const maxActualScore = Math.max(...testScoreData.map(t => t.score || 0));
-    const maxPossibleScore = Math.max(...testScoreData.map(t => t.maxScore || 27));
-    
-    // Calculate height: larger base height for better visibility
-    // Minimum 400px, scales up to 600px based on score ratio
-    const scoreRatio = maxActualScore / maxPossibleScore;
-    const baseHeight = 400; // Increased from 256
-    const additionalHeight = scoreRatio * 200; // Up to 200px additional
-    return Math.max(baseHeight, Math.min(baseHeight + additionalHeight, 600));
+    // Base height scales with maximum score
+    // For scores up to 27, use 400-600px range
+    const baseHeight = 400;
+    const scoreBasedHeight = Math.min(400 + (maxActualScore * 7), 600); // Scale up to 7px per score point
+    return Math.max(baseHeight, scoreBasedHeight);
   };
 
   const graphHeight = getGraphHeight();
   
-  // Helper to get bar height percentage - ensure minimum visibility
-  const getBarHeight = (score, maxScore) => {
-    if (!score || !maxScore) return 0;
-    const percentage = (score / maxScore) * 100;
-    // Ensure bars are at least 15% of graph height for visibility
-    return Math.max(percentage, 15);
+  // Helper to get bar height percentage based on ABSOLUTE score values
+  // This ensures score 10 is always twice as tall as score 5, regardless of test type
+  const getBarHeight = (score) => {
+    if (!score || maxActualScore === 0) return 0;
+    // Calculate percentage based on actual score relative to max actual score
+    const percentage = (score / maxActualScore) * 100;
+    // Ensure minimum visibility (at least 10% of graph height)
+    return Math.max(percentage, 10);
   };
 
   const getSeverityColor = (severity) => {
@@ -519,8 +521,22 @@ const Dashboard = () => {
               
               {/* Test Scores Graph */}
               <div className="relative w-full" style={{ height: `${graphHeight}px` }}>
+                {/* Y-axis labels */}
+                {testScoreData.length > 0 && (
+                  <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-between pr-2 pointer-events-none">
+                    {[0, 1, 2, 3, 4].map(i => {
+                      const scoreValue = Math.round((maxActualScore / 4) * (4 - i));
+                      return (
+                        <div key={i} className={`text-xs font-mono ${textSecondary}`}>
+                          {scoreValue}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
                 {/* Grid lines */}
-                <div className={`absolute inset-0 flex flex-col justify-between pointer-events-none pb-0 opacity-20 ${
+                <div className={`absolute inset-0 flex flex-col justify-between pointer-events-none pb-0 opacity-20 pl-8 ${
                   darkMode ? '' : 'border-gray-300'
                 }`}>
                   {[0, 1, 2, 3, 4].map(i => (
@@ -530,9 +546,9 @@ const Dashboard = () => {
                 
                 {/* Graph Bars - Individual test scores */}
                 {testScoreData.length > 0 ? (
-                  <div className="absolute inset-0 flex items-end justify-between px-6 gap-4">
+                  <div className="absolute inset-0 flex items-end justify-between px-6 gap-4 pl-12">
                     {testScoreData.map((testData, index) => {
-                      const barHeight = Math.max(getBarHeight(testData.score, testData.maxScore), 5);
+                      const barHeight = getBarHeight(testData.score);
                       
                       return (
                         <div key={testData.id} className="flex-1 flex flex-col justify-end items-center gap-2 group relative max-w-[100px]">
