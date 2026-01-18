@@ -215,28 +215,30 @@ const Dashboard = () => {
 
   const testScoreData = processTestScores();
   
-  // Calculate dynamic graph height based on maximum score
+  // Calculate dynamic graph height based on maximum score - make it larger
   const getGraphHeight = () => {
-    if (testScoreData.length === 0) return 256; // Default height
+    if (testScoreData.length === 0) return 400; // Default height increased
     
     // Find the maximum score and maxScore across all tests
     const maxActualScore = Math.max(...testScoreData.map(t => t.score || 0));
     const maxPossibleScore = Math.max(...testScoreData.map(t => t.maxScore || 27));
     
-    // Calculate height: base height + proportional height based on max score
-    // Minimum 256px, scales up to 400px based on score ratio
+    // Calculate height: larger base height for better visibility
+    // Minimum 400px, scales up to 600px based on score ratio
     const scoreRatio = maxActualScore / maxPossibleScore;
-    const baseHeight = 256;
-    const additionalHeight = scoreRatio * 144; // Up to 144px additional
-    return Math.max(baseHeight, Math.min(baseHeight + additionalHeight, 400));
+    const baseHeight = 400; // Increased from 256
+    const additionalHeight = scoreRatio * 200; // Up to 200px additional
+    return Math.max(baseHeight, Math.min(baseHeight + additionalHeight, 600));
   };
 
   const graphHeight = getGraphHeight();
   
-  // Helper to get bar height percentage
+  // Helper to get bar height percentage - ensure minimum visibility
   const getBarHeight = (score, maxScore) => {
     if (!score || !maxScore) return 0;
-    return (score / maxScore) * 100;
+    const percentage = (score / maxScore) * 100;
+    // Ensure bars are at least 15% of graph height for visibility
+    return Math.max(percentage, 15);
   };
 
   const getSeverityColor = (severity) => {
@@ -528,30 +530,30 @@ const Dashboard = () => {
                 
                 {/* Graph Bars - Individual test scores */}
                 {testScoreData.length > 0 ? (
-                  <div className="absolute inset-0 flex items-end justify-between px-4 gap-2">
+                  <div className="absolute inset-0 flex items-end justify-between px-6 gap-4">
                     {testScoreData.map((testData, index) => {
                       const barHeight = Math.max(getBarHeight(testData.score, testData.maxScore), 5);
                       
                       return (
-                        <div key={testData.id} className="flex-1 flex flex-col justify-end items-center gap-2 group relative max-w-[80px]">
+                        <div key={testData.id} className="flex-1 flex flex-col justify-end items-center gap-2 group relative max-w-[100px]">
                           <div 
-                            className="w-full rounded-t-sm transition-all duration-300 group-hover:opacity-100 relative border-2"
+                            className="w-full rounded-t-lg transition-all duration-300 group-hover:opacity-100 relative border-2 shadow-lg"
                             style={{
                               height: `${barHeight}%`,
                               backgroundColor: testData.color,
                               borderColor: `${testData.color}80`,
-                              minHeight: '30px',
+                              minHeight: '80px', // Increased from 30px for better visibility
                               maxHeight: '100%'
                             }}
                             title={`${testData.label}: ${testData.score}/${testData.maxScore}`}
                           >
-                            {/* Score label on hover */}
-                            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-white px-2 py-1 rounded whitespace-nowrap z-10"
+                            {/* Score label - always visible */}
+                            <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 opacity-100 transition-opacity text-sm font-bold text-white px-3 py-1.5 rounded-md shadow-lg whitespace-nowrap z-10"
                                  style={{ backgroundColor: testData.color }}>
-                              {testData.score}
+                              {testData.score}/{testData.maxScore}
                             </div>
                             {/* Test type label inside bar */}
-                            <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 text-[9px] font-bold text-white opacity-90">
+                            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs font-bold text-white opacity-95 drop-shadow-lg">
                               {testData.label}
                             </div>
                           </div>
