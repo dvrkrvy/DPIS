@@ -505,7 +505,7 @@ const Dashboard = () => {
                 {/* Graph Container */}
                 <div className="relative w-full" style={{ height: `${graphHeight}px` }}>
                   {/* Y-axis */}
-                  <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between border-r pr-2"
+                  <div className="absolute left-0 top-0 bottom-12 w-12 flex flex-col justify-between border-r pr-2"
                     style={{ borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
                     {testScoreData.length > 0 && [0, 1, 2, 3, 4].map(i => {
                       // Y-axis labels: 0 (bottom), 25%, 50%, 75%, maxActualScore (top)
@@ -523,8 +523,8 @@ const Dashboard = () => {
                     })}
                   </div>
                   
-                  {/* Graph Area - same height as Y-axis (minus bottom padding) */}
-                  <div className="ml-14 absolute top-0 bottom-8 left-0 right-0">
+                  {/* Graph Area - Full height for bars */}
+                  <div className="ml-14 absolute top-0 bottom-12 left-0 right-0" style={{ height: `${graphHeight - 48}px` }}>
                     {/* Grid Lines - aligned with Y-axis values */}
                     <div className="absolute inset-0 flex flex-col justify-between">
                       {[0, 1, 2, 3, 4].map(i => (
@@ -537,28 +537,32 @@ const Dashboard = () => {
                       ))}
                     </div>
                     
-                    {/* Bars */}
+                    {/* Bars Container - Uses full height */}
                     {testScoreData.length > 0 ? (
-                      <div className="absolute inset-0 flex items-end justify-around gap-3 px-4">
+                      <div className="absolute inset-0 flex items-end justify-around gap-3 px-4" style={{ height: '100%' }}>
                         {testScoreData.map((testData, index) => {
                           const isLastBar = index === testScoreData.length - 1;
-                          // Calculate bar height as percentage of graph area
-                          // Y-axis top = maxActualScore, bottom = 0
-                          // Bar height = (score / maxActualScore) * 100%
-                          // If score = maxActualScore, bar should reach 100% (top grid line)
-                          // If score = 0, bar should be at 0% (bottom)
-                          const barHeightPercent = maxActualScore > 0 
-                            ? (testData.score / maxActualScore) * 100 
+                          // Calculate bar height as percentage of FULL graph area height
+                          // Graph area height = graphHeight - 48px (for labels)
+                          const graphAreaHeight = graphHeight - 48;
+                          // Bar height = (score / maxActualScore) * graphAreaHeight
+                          const barHeightPixels = maxActualScore > 0 
+                            ? (testData.score / maxActualScore) * graphAreaHeight
                             : 0;
-                          // For score 0, show a tiny visible bar, otherwise use exact percentage
+                          // Convert to percentage of container
+                          const barHeightPercent = graphAreaHeight > 0
+                            ? (barHeightPixels / graphAreaHeight) * 100
+                            : 0;
+                          // For score 0, show a tiny visible bar
                           const barHeight = testData.score === 0 ? 2 : barHeightPercent;
                           
                           return (
                             <div 
                               key={testData.id} 
-                              className="flex-1 flex flex-col items-center justify-end gap-2 group relative max-w-[120px]"
+                              className="flex-1 flex flex-col items-center justify-end group relative max-w-[120px]"
+                              style={{ height: '100%' }}
                             >
-                              {/* Bar */}
+                              {/* Bar - Uses full available height */}
                               <div 
                                 className={`w-full rounded-t transition-all duration-300 hover:opacity-90 ${
                                   isLastBar ? 'ring-2 ring-cyan-400/50 shadow-lg' : ''
@@ -566,7 +570,7 @@ const Dashboard = () => {
                                 style={{
                                   height: `${barHeight}%`,
                                   backgroundColor: testData.color,
-                                  minHeight: testData.score === 0 ? '4px' : '0px', // No minHeight for non-zero scores
+                                  minHeight: testData.score === 0 ? '4px' : '0px',
                                   boxShadow: isLastBar 
                                     ? `0 0 15px ${testData.color}50`
                                     : `0 2px 4px rgba(0,0,0,0.1)`
@@ -579,20 +583,6 @@ const Dashboard = () => {
                                   {testData.score}
                                 </div>
                               </div>
-                              
-                              {/* X-axis Labels */}
-                              <div className="flex flex-col items-center gap-1 mt-2">
-                                <span className={`text-xs font-medium ${
-                                  isLastBar 
-                                    ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
-                                    : textSecondary
-                                }`}>
-                                  {testData.date}
-                                </span>
-                                <span className={`text-[10px] ${textSecondary}`}>
-                                  {testData.label}
-                                </span>
-                              </div>
                             </div>
                           );
                         })}
@@ -604,8 +594,31 @@ const Dashboard = () => {
                     )}
                   </div>
                   
-                  {/* X-axis space for labels */}
-                  <div className="absolute bottom-0 left-14 right-0 h-8"></div>
+                  {/* X-axis Labels - Below the graph */}
+                  {testScoreData.length > 0 && (
+                    <div className="absolute bottom-0 left-14 right-0 h-12 flex items-start justify-around gap-3 px-4">
+                      {testScoreData.map((testData, index) => {
+                        const isLastBar = index === testScoreData.length - 1;
+                        return (
+                          <div 
+                            key={testData.id} 
+                            className="flex-1 flex flex-col items-center gap-1 max-w-[120px]"
+                          >
+                            <span className={`text-xs font-medium ${
+                              isLastBar 
+                                ? darkMode ? 'text-white font-bold' : 'text-gray-900 font-bold'
+                                : textSecondary
+                            }`}>
+                              {testData.date}
+                            </span>
+                            <span className={`text-[10px] ${textSecondary}`}>
+                              {testData.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
               
