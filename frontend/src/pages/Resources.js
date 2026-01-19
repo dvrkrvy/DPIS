@@ -334,32 +334,56 @@ const Resources = () => {
                   }`}
                 >
                   {/* Image Section */}
-                  <div className="h-48 relative overflow-hidden">
+                  <div className="h-48 relative overflow-hidden bg-black">
                     <div className={`absolute inset-0 z-10 bg-gradient-to-t ${
                       darkMode ? 'from-gray-900 to-transparent' : 'from-white to-transparent'
                     }`}></div>
-                    {resource.imageUrl ? (
-                      <img
-                        alt={resource.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-80 group-hover:opacity-100"
-                        src={resource.imageUrl}
-                      />
-                    ) : (
-                      <div className={`w-full h-full ${
-                        resource.contentType?.toLowerCase().includes('video') 
-                          ? darkMode ? 'bg-gray-800' : 'bg-gray-200'
-                          : darkMode ? 'bg-gray-800' : 'bg-gray-100'
-                      }`}>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          {resource.contentType?.toLowerCase().includes('video') && (
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-opacity duration-300 ${
-                              darkMode ? 'bg-purple-500/80 text-white' : 'bg-purple-500 text-white'
-                            } opacity-0 group-hover:opacity-100`}>
-                              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z"/>
-                              </svg>
-                            </div>
-                          )}
+                    {(() => {
+                      // Try multiple image field names
+                      const imageUrl = resource.imageUrl || resource.thumbnail || resource.image || resource.thumbnailUrl;
+                      
+                      // Default images based on content type
+                      const getDefaultImage = () => {
+                        const type = resource.contentType?.toLowerCase() || '';
+                        if (type.includes('audio')) {
+                          return "https://lh3.googleusercontent.com/aida-public/AB6AXuC1ZMKMeitb8C8eDnQwPU4KG6mk05u-2EC-2Bz8228nIdQPpRkrArj2lkMLelslNqqdx-xUglvocUeXCJMl9RCJnNFu8REAylXo9hxTKf3vT7lVR0CBbN_4uJPRP1Ovt3qp3RIa2hoUWoPx8X2sWxdxmdpmdGuAe7ojUtzdY2GJ-a-14paGLvu5Ce4RLMLg8mgUxIWShj6jhge0wLFLB_eHlnm3eAsGhEuDj2XfbHtcV8p_8k-Z5sNQ7MEfUSLLTLb3N32xXju_sOE";
+                        }
+                        if (type.includes('video')) {
+                          return "https://lh3.googleusercontent.com/aida-public/AB6AXuBVqQrWZsKAKDLPPIk5X1Kk7TctqX1lXRQ6JXu3_F7SrHiPx0t5M-QT9Z-TDvTSrVvruIQ8QixuGRukR_QzjOntYzciqMkpFdkd0F0F2ngNbBtt0ff2PHrvLwS03RY859sX3hTNL7H3fF0pg4tDDr6RffFthC46_IDIBboCN76kGJRKhCDi8E_pQg_miBFRgNosVAdu7ZGvkm4Vm7GQZykMIWf0PhWEzi9JMAJk_aH_AgP-WKjg3k0_Xk09CFDQjpS3rE-0OkccuAc";
+                        }
+                        if (type.includes('article')) {
+                          return "https://lh3.googleusercontent.com/aida-public/AB6AXuAvkVSfHXQOIW3deTI-Olk27hP38p1m5O8euo9m9Zaf-TF0rfAFcr1C3jeoyvs7e6xwnBaaSEjC2OCyBHng7V3ODy33wu3cKTy7IXrChQPvOTHFUz_NluUZBG3RpeHVQ0nLGlsXDNKsluOtzUuDCO7pQ27BpjKMCbpzpvAi6GOtx-Uq4c9HwPYoQ8cCWwUOAdUiSOFxANitYtfsh1u48Xn9ARh4Oe7rbOxvtuh7NBDvP20H2pXxCkB6fyemJnwyNTBHKxJ-GeKmbP8";
+                        }
+                        // Default fallback
+                        return "https://lh3.googleusercontent.com/aida-public/AB6AXuASc3PPUIlj2XkO3b10BLZEh2EQTcPrbRvJrsp5rgQTgBQ1pcm7B3BObfMk8-m-nA5ko_7Zo4DZFKllrQG4uqXhlkDUPbgmsW_LRI8fEki6Jq2wL8eKkRc-ysiWc1TbAkVMNar_Y751_y6eP3BZPaueq-x8k8Xh3iYh_NJqRZwQfBEEMbBSpRQq9YkR6N_QmYUy9-Swv9-MpTn6twUZwuzMqJr-2zTKRuYvswNhR88j-5WAzXMGIR0l2VLXYMZO4mlNIU4h46sExWw";
+                      };
+
+                      const finalImageUrl = imageUrl || getDefaultImage();
+                      
+                      return (
+                        <img
+                          alt={resource.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100 grayscale group-hover:grayscale-0"
+                          src={finalImageUrl}
+                          onError={(e) => {
+                            // Fallback to default if image fails to load
+                            e.target.src = getDefaultImage();
+                          }}
+                        />
+                      );
+                    })()}
+                    
+                    {/* Video play overlay */}
+                    {resource.contentType?.toLowerCase().includes('video') && (
+                      <div className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          darkMode 
+                            ? 'bg-purple-500/80 backdrop-blur text-white shadow-lg shadow-purple-500/50' 
+                            : 'bg-purple-500 text-white shadow-lg shadow-purple-500/40'
+                        } transform hover:scale-110 transition-transform`}>
+                          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
                         </div>
                       </div>
                     )}
