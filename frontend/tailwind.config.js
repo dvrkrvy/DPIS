@@ -42,8 +42,9 @@ module.exports = {
         'text-main': '#000000',
         'text-muted': '#525252',
         'bg-deep': '#050505',
+        'bg-black': '#000000',
         'primary-accent': '#8B5CF6',
-        charcoal: '#36454F',
+        charcoal: '#1A1A1A',
       },
       fontFamily: {
         'space-grotesk': ['Space Grotesk', 'sans-serif'],

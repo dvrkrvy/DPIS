@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -13,7 +14,8 @@ const AIChat = () => {
     {
       role: 'assistant',
       content: 'Hello! I\'m here to provide emotional support and listen. How are you feeling today?',
-      isEmergency: false
+      isEmergency: false,
+      timestamp: new Date()
     }
   ]);
   const [input, setInput] = useState('');
@@ -28,13 +30,20 @@ const AIChat = () => {
     scrollToBottom();
   }, [messages]);
 
+  const formatTime = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    const userMsg = { role: 'user', content: userMessage, timestamp: new Date() };
+    setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
     try {
@@ -50,7 +59,8 @@ const AIChat = () => {
         role: 'assistant',
         content: response.data.message,
         isEmergency: response.data.isEmergency,
-        emergencyContacts: response.data.emergencyContacts
+        emergencyContacts: response.data.emergencyContacts,
+        timestamp: new Date()
       }]);
 
       if (response.data.isEmergency) {
@@ -60,110 +70,138 @@ const AIChat = () => {
       toast.error('Failed to send message');
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'I\'m sorry, I\'m having trouble right now. Please try again or contact support.'
+        content: 'I\'m sorry, I\'m having trouble right now. Please try again or contact support.',
+        timestamp: new Date()
       }]);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl flex flex-col border border-gray-200 dark:border-gray-700" style={{ height: '600px' }}>
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-4 rounded-t-xl">
-          <h1 className="text-xl font-bold">AI Support Chat</h1>
-          <p className="text-sm opacity-90">Confidential and supportive conversation</p>
-        </div>
+  const handleEmergencyClick = async () => {
+    try {
+      const response = await api.get('/api/emergency/contacts', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEmergencyContacts(response.data.contacts);
+      setShowEmergencyModal(true);
+    } catch (error) {
+      console.error('Failed to fetch emergency contacts:', error);
+      setEmergencyContacts({
+        hotline: '988',
+        institutionEmail: 'support@dpis.edu',
+        institutionPhone: '1-800-273-8255'
+      });
+      setShowEmergencyModal(true);
+    }
+  };
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+  return (
+    <div className="bg-bg-black text-white min-h-screen flex flex-col font-space-grotesk overflow-hidden relative">
+      {/* Geometric Background */}
+      <div className="fixed inset-0 z-0 geometric-bg pointer-events-none"></div>
+
+      {/* Main Content */}
+      <main className="flex-grow flex items-center justify-center p-6 relative z-10 pt-24">
+        <div className="w-full max-w-4xl h-[70vh] flex flex-col chat-container bg-black overflow-hidden">
+          {/* Header */}
+          <div className="bg-primary p-6">
+            <h2 className="text-2xl font-bold tracking-tight text-white uppercase">AI Support Chat</h2>
+            <p className="text-[10px] uppercase tracking-widest opacity-80 mt-1">Confidential and supportive conversation</p>
+          </div>
+
+          {/* Messages Area */}
+          <div className="flex-grow overflow-y-auto p-8 space-y-8 custom-scrollbar">
+            {messages.map((message, index) => (
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-xl shadow-md ${
-                  message.role === 'user'
-                    ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white'
-                    : message.isEmergency
-                    ? 'bg-red-100 dark:bg-red-900/30 border-2 border-red-500 dark:border-red-600 text-red-900 dark:text-red-200'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                }`}
+                key={index}
+                className={`flex flex-col ${message.role === 'user' ? 'items-end ml-auto' : 'items-start'} max-w-[80%]`}
               >
-                <p className="whitespace-pre-wrap">{message.content}</p>
-                {message.isEmergency && message.emergencyContacts && (
-                  <div className="mt-3 pt-3 border-t border-red-300">
-                    <p className="font-semibold mb-2">Emergency Contacts:</p>
-                    <p className="text-sm">Hotline: {message.emergencyContacts.hotline}</p>
-                    <p className="text-sm">Email: {message.emergencyContacts.institutionEmail}</p>
-                  </div>
-                )}
+                <div
+                  className={`${
+                    message.role === 'user'
+                      ? 'bg-primary text-white'
+                      : message.isEmergency
+                      ? 'bg-red-900/50 border-red-500 text-white border-2'
+                      : 'bg-charcoal text-white border border-white/5'
+                  } p-5 text-sm leading-relaxed shadow-xl`}
+                >
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+                  {message.isEmergency && message.emergencyContacts && (
+                    <div className="mt-3 pt-3 border-t border-red-500/50">
+                      <p className="font-semibold mb-2">Emergency Contacts:</p>
+                      <p className="text-sm">Hotline: {message.emergencyContacts.hotline}</p>
+                      {message.emergencyContacts.institutionEmail && (
+                        <p className="text-sm">Email: {message.emergencyContacts.institutionEmail}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <span className="text-[9px] uppercase tracking-widest text-gray-600 mt-2 font-bold">
+                  {message.role === 'user' ? 'You' : 'AI Assistant'} • {formatTime(message.timestamp)}
+                </span>
               </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <div className="bg-gray-200 px-4 py-2 rounded-lg">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            ))}
+            {loading && (
+              <div className="flex flex-col items-start max-w-[80%]">
+                <div className="bg-charcoal text-white p-5 text-sm leading-relaxed border border-white/5 shadow-xl">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        <form onSubmit={handleSend} className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-b-xl">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-              disabled={loading}
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-2 rounded-lg hover:from-primary-700 hover:to-primary-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200 font-medium"
-            >
-              Send
-            </button>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            This AI is not a replacement for professional help. In emergencies, contact emergency services.
-          </p>
-        </form>
-      </div>
+
+          {/* Input Area */}
+          <div className="p-8 border-t border-white/10 bg-black">
+            <form onSubmit={handleSend} className="flex gap-4">
+              <div className="relative flex-grow">
+                <input
+                  className="w-full bg-transparent border border-white/20 text-white px-6 py-4 focus:ring-0 focus:border-primary transition-colors text-sm placeholder:text-gray-700"
+                  placeholder="Type your message..."
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <button
+                className="bg-primary hover:bg-[#B533FF] text-white px-8 py-4 font-bold uppercase tracking-widest text-xs transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                type="submit"
+                disabled={loading || !input.trim()}
+              >
+                Send
+                <span className="material-symbols-outlined text-sm">send</span>
+              </button>
+            </form>
+            <p className="text-[9px] text-gray-600 uppercase tracking-widest mt-4 text-center">
+              This AI is not a replacement for professional help. In emergencies, contact emergency services.
+            </p>
+          </div>
+        </div>
+      </main>
+
+      {/* Bottom Right Icons */}
+      <footer className="p-6 flex justify-end items-end z-10 pointer-events-none fixed bottom-0 right-0">
+        <div className="flex gap-6">
+          <span className="material-symbols-outlined text-gray-800 text-lg">verified_user</span>
+          <span className="material-symbols-outlined text-gray-800 text-lg">encrypted</span>
+        </div>
+      </footer>
 
       {/* Floating Emergency Button */}
-      <div className="fixed bottom-8 right-8 z-40">
+      <div className="fixed bottom-8 right-24 z-40">
         <button
           className={`flex items-center justify-center w-12 h-12 rounded-full border shadow-lg transition-all hover:scale-110 ${
             darkMode
               ? 'bg-red-600/10 border-red-500/50 text-red-500 hover:bg-red-600 hover:text-white'
               : 'bg-red-50 border-red-300 text-red-600 hover:bg-red-600 hover:text-white'
           }`}
-          onClick={async () => {
-            try {
-              const response = await api.get('/api/emergency/contacts', {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              setEmergencyContacts(response.data.contacts);
-              setShowEmergencyModal(true);
-            } catch (error) {
-              console.error('Failed to fetch emergency contacts:', error);
-              setEmergencyContacts({
-                hotline: '988',
-                institutionEmail: 'support@dpis.edu',
-                institutionPhone: '1-800-273-8255'
-              });
-              setShowEmergencyModal(true);
-            }
-          }}
+          onClick={handleEmergencyClick}
           title="Emergency Support"
         >
           <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -175,38 +213,38 @@ const AIChat = () => {
       {/* Emergency Modal */}
       {showEmergencyModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
           onClick={() => setShowEmergencyModal(false)}
         >
           <div
-            className={`${darkMode ? 'bg-gray-900' : 'bg-white'} border ${darkMode ? 'border-white/10' : 'border-gray-200'} rounded-xl p-6 max-w-md w-full shadow-2xl`}
+            className="bg-gray-900 border border-white/10 rounded-xl p-6 max-w-md w-full shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Emergency Support</h2>
-            <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              If you are in immediate danger, please call <strong className="text-red-600 dark:text-red-400">911</strong> or your local emergency services.
+            <h2 className="text-2xl font-bold text-red-400 mb-4">🆘 Emergency Support</h2>
+            <p className="mb-4 text-gray-400">
+              If you are in immediate danger, please call <strong className="text-red-400">911</strong> or your local emergency services.
             </p>
             <div className="space-y-4 mb-6">
-              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'}`}>
-                <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>National Suicide Prevention Lifeline:</strong>
-                <a href="tel:988" className="text-red-600 dark:text-red-400 font-semibold text-lg hover:underline">988</a>
+              <div className="p-4 rounded-lg border bg-red-900/20 border-red-800">
+                <strong className="block mb-1 text-white">National Suicide Prevention Lifeline:</strong>
+                <a href="tel:988" className="text-red-400 font-semibold text-lg hover:underline">988</a>
               </div>
-              <div className={`p-4 rounded-lg border ${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
-                <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>Crisis Text Line:</strong>
-                <p className="text-blue-600 dark:text-blue-400 font-semibold">Text HOME to 741741</p>
+              <div className="p-4 rounded-lg border bg-blue-900/20 border-blue-800">
+                <strong className="block mb-1 text-white">Crisis Text Line:</strong>
+                <p className="text-blue-400 font-semibold">Text HOME to 741741</p>
               </div>
               {emergencyContacts?.institutionEmail && (
-                <div className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                  <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>Institution Email:</strong>
-                  <a href={`mailto:${emergencyContacts.institutionEmail}`} className="text-purple-600 dark:text-purple-400 font-semibold hover:underline">
+                <div className="p-4 rounded-lg border bg-gray-700/50 border-gray-600">
+                  <strong className="block mb-1 text-white">Institution Email:</strong>
+                  <a href={`mailto:${emergencyContacts.institutionEmail}`} className="text-purple-400 font-semibold hover:underline">
                     {emergencyContacts.institutionEmail}
                   </a>
                 </div>
               )}
               {emergencyContacts?.institutionPhone && (
-                <div className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                  <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>Institution Phone:</strong>
-                  <a href={`tel:${emergencyContacts.institutionPhone}`} className="text-purple-600 dark:text-purple-400 font-semibold hover:underline">
+                <div className="p-4 rounded-lg border bg-gray-700/50 border-gray-600">
+                  <strong className="block mb-1 text-white">Institution Phone:</strong>
+                  <a href={`tel:${emergencyContacts.institutionPhone}`} className="text-purple-400 font-semibold hover:underline">
                     {emergencyContacts.institutionPhone}
                   </a>
                 </div>
@@ -214,11 +252,7 @@ const AIChat = () => {
             </div>
             <button
               onClick={() => setShowEmergencyModal(false)}
-              className={`w-full font-bold py-2 px-4 rounded-lg transition-colors ${
-                darkMode
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                  : 'bg-black hover:bg-gray-900 text-white'
-              }`}
+              className="w-full font-bold py-2 px-4 rounded-lg transition-colors bg-purple-600 hover:bg-purple-700 text-white"
             >
               Close
             </button>
