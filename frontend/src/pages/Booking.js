@@ -10,7 +10,7 @@ const Booking = () => {
   const { darkMode } = useTheme();
   const navigate = useNavigate();
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [emergencyContacts] = useState(null);
+  const [emergencyContacts, setEmergencyContacts] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedDate, setSelectedDate] = useState('');
@@ -163,29 +163,28 @@ const Booking = () => {
     return modeLabels[mode] || mode;
   };
 
+  const handleEmergencyClick = async () => {
+    try {
+      const response = await api.get('/api/emergency/contacts', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEmergencyContacts(response.data.contacts);
+      setShowEmergencyModal(true);
+    } catch (error) {
+      console.error('Failed to fetch emergency contacts:', error);
+      // Show default contacts even if API fails
+      setEmergencyContacts({
+        hotline: '988',
+        institutionEmail: 'support@dpis.edu',
+        institutionPhone: '1-800-273-8255'
+      });
+      setShowEmergencyModal(true);
+    }
+  };
+
   return (
     <div className={`min-h-screen flex flex-col ${darkMode ? 'bg-black' : 'bg-surface-light'}`}>
-      {/* Header Banner */}
-      <div className={`fixed w-full top-0 z-50 border-b ${darkMode ? 'border-white/10 glass-effect' : 'border-gray-300 glass-effect'}`}>
-        <div className={`${darkMode ? 'bg-gradient-to-r from-primary/20 via-blue-900/20 to-primary/20 border-b border-white/5' : 'bg-gray-50 border-b border-gray-200'} h-8 flex items-center overflow-hidden`}>
-          <div className={`whitespace-nowrap animate-scroll-text text-xs font-mono ${darkMode ? 'text-secondary' : 'text-gray-600'} flex items-center gap-8`}>
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              SYSTEM: BOOKING ENGINE ONLINE
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="material-icons-outlined text-sm">event_available</span>
-              SLOTS AVAILABLE: {availableSlots.length}
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="material-icons-outlined text-sm">psychology</span>
-              SPECIALIST: ONLINE
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <main className="pt-32 pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-12 flex-grow relative z-10">
+      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto space-y-12 flex-grow relative z-10">
         {/* Title Section */}
         <div className="reveal-up text-center space-y-4">
           <h1 className={`text-4xl md:text-5xl font-display font-bold tracking-tight ${darkMode ? 'text-white' : 'text-black'}`}>
@@ -211,8 +210,11 @@ const Booking = () => {
                     Select Date
                   </label>
                   <div className="relative">
+                    <div className={`absolute left-4 top-1/2 transform -translate-y-1/2 pointer-events-none ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <span className="material-icons-outlined text-xl">calendar_today</span>
+                    </div>
                     <input
-                      className={`w-full ${darkMode ? 'bg-black/50 border-white/10 text-white placeholder-gray-500 hover:bg-black/70' : 'bg-transparent border-gray-300 text-black placeholder-gray-400 hover:border-gray-400'} border rounded-lg px-4 py-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer appearance-none font-medium`}
+                      className={`w-full ${darkMode ? 'bg-black/50 border-white/10 text-white placeholder-gray-500 hover:bg-black/70 focus:bg-black/70' : 'bg-transparent border-gray-300 text-black placeholder-gray-400 hover:border-gray-400 focus:border-primary'} border rounded-lg pl-12 pr-4 py-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer appearance-none font-medium`}
                       id="date"
                       type="date"
                       value={selectedDate}
@@ -407,17 +409,36 @@ const Booking = () => {
         </div>
       </main>
 
-      {/* Floating Action Buttons */}
+      {/* Floating Action Buttons - Same as Dashboard */}
       <div className="fixed bottom-8 right-8 flex flex-col gap-4 z-40 items-end">
-        <button
-          className={`flex items-center justify-center w-14 h-14 rounded-full ${darkMode ? 'bg-surface-card border-white/10 text-white' : 'bg-white border-gray-200 text-black'} border shadow-lg hover:shadow-xl hover:scale-110 transition-all group relative overflow-hidden`}
+        {/* AI Support Assistant Button */}
+        <button 
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:brightness-110 text-white shadow-lg shadow-purple-500/40 transition-all hover:scale-110"
           onClick={() => navigate('/ai-chat')}
           title="AI Support Chat"
         >
-          <span className="material-icons-outlined relative z-10">help_outline</span>
-          <span className={`absolute right-16 ${darkMode ? 'bg-black text-white border-white/10' : 'bg-black text-white'} text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-sm border`}>
-            Help Center
-          </span>
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C8.69 2 6 4.69 6 8c0 1.1.27 2.14.75 3.05L3 18l6.95-3.75c.91.48 1.95.75 3.05.75 3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
+            <circle cx="10" cy="8" r="1"/>
+            <circle cx="14" cy="8" r="1"/>
+            <path d="M9 11h6v1.5H9z"/>
+            <path d="M12 1.5v2M7 3.5l1.5-1.5M17 3.5l-1.5-1.5"/>
+          </svg>
+        </button>
+
+        {/* Emergency Button */}
+        <button 
+          className={`flex items-center justify-center w-12 h-12 rounded-full border shadow-lg transition-all hover:scale-110 ${
+            darkMode 
+              ? 'bg-red-600/10 border-red-500/50 text-red-500 hover:bg-red-600 hover:text-white' 
+              : 'bg-red-50 border-red-300 text-red-600 hover:bg-red-600 hover:text-white'
+          }`}
+          onClick={handleEmergencyClick}
+          title="Emergency Support"
+        >
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
         </button>
       </div>
 
@@ -437,7 +458,7 @@ const Booking = () => {
             className={`${darkMode ? 'bg-gray-900 border-white/10' : 'bg-white border-gray-200'} border rounded-xl p-6 max-w-md w-full shadow-2xl`}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>Emergency Support</h2>
+            <h2 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>🆘 Emergency Support</h2>
             <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               If you are in immediate danger, please call <strong className={darkMode ? 'text-red-400' : 'text-red-600'}>911</strong> or your local emergency services.
             </p>
