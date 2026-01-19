@@ -98,6 +98,13 @@ const Progress = () => {
     }
   }, [token]);
 
+  useEffect(() => {
+    fetchProgress();
+    fetchMoodTrends();
+    fetchScreeningHistory();
+    fetchActivitySummary();
+  }, [timeRange, fetchProgress, fetchMoodTrends, fetchScreeningHistory, fetchActivitySummary]);
+
   const handleMoodSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -245,7 +252,8 @@ const Progress = () => {
     }
   };
 
-  if (loading) {
+  // Show loading only for initial load
+  if (loading && moodHistory.length === 0 && screeningHistory.length === 0) {
     return (
       <div className={`flex items-center justify-center min-h-screen ${darkMode ? 'bg-black' : 'bg-white'}`}>
         <div className="text-center">
