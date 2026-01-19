@@ -41,7 +41,12 @@ module.exports = {
         'border-light': '#E5E5E5',
         'text-main': '#000000',
         'text-muted': '#525252',
+        'bg-deep': '#050505',
+        'primary-accent': '#8B5CF6',
         charcoal: '#36454F',
+      },
+      fontFamily: {
+        'space-grotesk': ['Space Grotesk', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in',
