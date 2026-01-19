@@ -6,11 +6,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import toast from 'react-hot-toast';
 
 const Booking = () => {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const { darkMode } = useTheme();
   const navigate = useNavigate();
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [emergencyContacts, setEmergencyContacts] = useState(null);
+  const [emergencyContacts] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [availableSlots, setAvailableSlots] = useState([]);
   const [selectedDate, setSelectedDate] = useState('');
@@ -19,20 +19,7 @@ const Booking = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
-  useEffect(() => {
-    if (selectedDate) {
-      fetchSlots();
-    } else {
-      setAvailableSlots([]);
-      setSelectedSlot('');
-    }
-  }, [selectedDate]);
-
-  const fetchBookings = async () => {
+  const fetchBookings = React.useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get('/api/booking/my-bookings', {
@@ -45,9 +32,9 @@ const Booking = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const fetchSlots = async () => {
+  const fetchSlots = React.useCallback(async () => {
     try {
       const response = await api.get(`/api/booking/slots?date=${selectedDate}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -58,7 +45,21 @@ const Booking = () => {
       toast.error('Failed to fetch available slots');
       setAvailableSlots([]);
     }
-  };
+  }, [selectedDate, token]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  useEffect(() => {
+    if (selectedDate) {
+      fetchSlots();
+    } else {
+      setAvailableSlots([]);
+      setSelectedSlot('');
+    }
+  }, [selectedDate, fetchSlots]);
+
 
   const handleBooking = async (e) => {
     e.preventDefault();
@@ -160,17 +161,6 @@ const Booking = () => {
       text: 'Text Chat'
     };
     return modeLabels[mode] || mode;
-  };
-
-  // Get user display name
-  const getUserDisplayName = () => {
-    if (user?.username) return user.username;
-    if (user?.name) return user.name;
-    if (user?.anonymous_id) {
-      const id = user.anonymous_id;
-      return id.length > 12 ? id.substring(0, 8) + '...' : id;
-    }
-    return 'User';
   };
 
   return (
@@ -311,9 +301,13 @@ const Booking = () => {
                 </button>
                 <p className={`text-center text-xs mt-4 ${darkMode ? 'text-gray-500' : 'text-gray-500 font-medium'}`}>
                   By booking, you agree to our{' '}
-                  <a className={`${darkMode ? 'text-gray-400 underline hover:text-white' : 'text-black underline hover:text-primary'} transition-colors`} href="#">
+                  <button 
+                    type="button"
+                    className={`${darkMode ? 'text-gray-400 underline hover:text-white' : 'text-black underline hover:text-primary'} transition-colors cursor-pointer`}
+                    onClick={() => toast.info('Cancellation Policy: You can cancel bookings up to 24 hours before the scheduled time.')}
+                  >
                     Cancellation Policy
-                  </a>.
+                  </button>.
                 </p>
               </div>
             </form>
