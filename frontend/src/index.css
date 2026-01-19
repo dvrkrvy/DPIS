@@ -110,6 +110,65 @@ code {
 }
 
 .dark .bg-mesh-card {
-  background: radial-gradient(at 0% 0%, rgba(124, 77, 255, 0.15) 0px, transparent 50%), 
-              radial-gradient(at 100% 100%, rgba(0, 229, 255, 0.1) 0px, transparent 50%);
+  background: radial-gradient(at 0% 0%, rgba(124, 77, 255, 0.08) 0px, transparent 50%), 
+              radial-gradient(at 100% 100%, rgba(0, 229, 255, 0.05) 0px, transparent 50%);
+}
+
+/* Glass effect */
+.glass-effect {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dark .glass-effect {
+  background: rgba(10, 10, 10, 0.7);
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* Button glow effect */
+.btn-glow {
+  box-shadow: 0 0 15px rgba(124, 77, 255, 0.4);
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 25px rgba(124, 77, 255, 0.6);
+}
+
+/* Date input styling for dark mode */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+/* Scroll text animation */
+@keyframes scroll-text {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-scroll-text {
+  animation: scroll-text 30s linear infinite;
+}
+
+/* Pulse glow animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(124, 77, 255, 0.5);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 10px rgba(124, 77, 255, 0.2);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
