@@ -478,7 +478,7 @@ const ScreeningTest = () => {
                 style={{ width: `${progress}%` }}
               >
                 {darkMode && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-full h-full animate-pulse"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-full h-full" style={{ animation: 'shimmer 2s infinite' }}></div>
                 )}
               </div>
             </div>
