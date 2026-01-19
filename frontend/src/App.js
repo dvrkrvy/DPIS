@@ -5,7 +5,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import PrivateRoute from './components/PrivateRoute';
 import Navbar from './components/Navbar';
-import EmergencyButton from './components/EmergencyButton';
 
 // Student Pages
 import Onboarding from './pages/Onboarding';
@@ -21,44 +20,14 @@ import AIChat from './pages/AIChat';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 
-function AIChatButton() {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  // Hide on public auth pages (onboarding/login) AND on pages that have their own buttons (dashboard, screening)
-  const pathname = location.pathname;
-  if (pathname === '/onboarding' || pathname === '/admin/login' || pathname === '/' || pathname === '' || pathname === '/dashboard' || pathname === '/screening') {
-    return null;
-  }
-
-  // Floating AI Chat button - exact same size as Emergency, slightly above it
-  return (
-    <button
-      onClick={() => navigate('/ai-chat')}
-      className="fixed bottom-20 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-lg z-50 flex items-center justify-center gap-2"
-      style={{ width: '160px' }}
-      title="AI Support Chat"
-    >
-      <span>🤖</span>
-      <span>AI Chat</span>
-    </button>
-  );
-}
-
 function AppContent() {
   const { darkMode } = useTheme();
-  const location = useLocation();
-  
-  // Don't show old floating buttons on pages that have their own buttons
-  const showOldButtons = location.pathname !== '/dashboard' && location.pathname !== '/screening';
 
   return (
     <div className={`min-h-screen transition-colors duration-200 ${
       darkMode ? 'bg-gray-900' : 'bg-gray-50'
     }`}>
       <Navbar />
-      {showOldButtons && <AIChatButton />}
-      {showOldButtons && <EmergencyButton />}
 
       <Routes>
         {/* Public routes */}

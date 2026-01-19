@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { io } from 'socket.io-client';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import toast from 'react-hot-toast';
 import API_BASE_URL from '../config';
 
@@ -10,6 +11,9 @@ const Forum = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
+  const { darkMode } = useTheme();
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [emergencyContacts, setEmergencyContacts] = useState(null);
 
   const [posts, setPosts] = useState([]);
   const [post, setPost] = useState(null);

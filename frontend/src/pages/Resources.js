@@ -500,25 +500,6 @@ const Resources = () => {
       {/* Floating Action Buttons */}
       <div className="fixed bottom-8 right-8 flex flex-col gap-4 z-40 items-end">
         <button
-          className={`flex items-center justify-center w-14 h-14 rounded-full border shadow-lg hover:scale-110 transition-transform group relative overflow-hidden ${
-            darkMode
-              ? 'bg-gray-900 border-white/10 text-white'
-              : 'bg-white border-gray-200 text-gray-600 hover:text-black'
-          }`}
-          title="Help Center"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.79 4 4s-1.79 4-4 4c-1.742 0-3.223-.835-3.772-2M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-4 4a4 4 0 01-5.656-5.656l.707-.707m5.656-5.656l.707-.707" />
-          </svg>
-          <span className={`absolute right-16 text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border shadow-md ${
-            darkMode ? 'bg-black text-white border-white/10' : 'bg-black text-white'
-          }`}>
-            Help Center
-          </span>
-        </button>
-
-        <button
           className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:brightness-110 text-white shadow-lg shadow-purple-500/40 transition-all hover:scale-110"
           onClick={() => navigate('/ai-chat')}
           title="AI Support Chat"
