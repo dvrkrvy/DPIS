@@ -131,6 +131,47 @@ A comprehensive web-based mental health support platform designed for higher-edu
    ```
    Frontend runs on http://localhost:3000
 
+## 🌐 GitHub Pages Deployment
+
+This project is configured for automatic deployment to GitHub Pages.
+
+### Repository & Live Site
+- **GitHub Repository**: https://github.com/dvrkrvy/DPIS
+- **GitHub Pages URL**: https://dvrkrvy.github.io/DPIS
+
+### Automatic Deployment
+
+The project includes a GitHub Actions workflow that automatically deploys to GitHub Pages whenever you push to the `main` branch.
+
+**To enable:**
+1. Go to repository Settings → Pages
+2. Under "Source", select **GitHub Actions**
+3. Save
+
+**To deploy:**
+```bash
+git add .
+git commit -m "Your changes"
+git push origin main
+```
+The workflow will automatically build and deploy your site.
+
+### Manual Deployment
+
+You can also deploy manually using the provided scripts:
+
+**Windows:**
+```bash
+deploy-to-github-pages.bat
+```
+
+**PowerShell:**
+```powershell
+.\deploy-to-github-pages.ps1
+```
+
+For detailed deployment instructions, see [GITHUB_PAGES_SETUP.md](./GITHUB_PAGES_SETUP.md)
+
 ## 📁 Project Structure
 
 ```
