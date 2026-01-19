@@ -168,8 +168,16 @@ const Progress = () => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   // Prepare chart data
@@ -294,7 +302,7 @@ const Progress = () => {
         {/* Record Mood and Activity Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
           {/* Record Mood */}
-            <div className={`lg:col-span-7 ${darkMode ? 'bg-black border-[#333333] hover:border-gray-500' : 'bg-white border-[#E0E0E0] hover:border-gray-400'} border p-8 relative group transition-colors duration-300`}>
+            <div className={`lg:col-span-7 ${darkMode ? 'bg-gray-900 border-[#333333] hover:border-gray-500' : 'bg-white border-[#E0E0E0] hover:border-gray-400'} border p-8 relative group transition-colors duration-300`}>
             <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'} flex items-center gap-3`}>
               <span className="material-symbols-outlined text-primary">mood</span>
               Record Mood
@@ -332,7 +340,7 @@ const Progress = () => {
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className={`w-full ${darkMode ? 'bg-black border-[#333333] text-white placeholder-gray-600' : 'bg-white border-[#E0E0E0] text-black placeholder-gray-400'} border p-4 focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none resize-none h-32`}
+                  className={`w-full ${darkMode ? 'bg-gray-900 border-[#333333] text-white placeholder-gray-600' : 'bg-white border-[#E0E0E0] text-black placeholder-gray-400'} border p-4 focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none resize-none h-32`}
                   placeholder="How are you feeling today? reflect on your day..."
                 />
               </div>
@@ -351,25 +359,25 @@ const Progress = () => {
 
           {/* Activity Summary */}
           <div className="lg:col-span-5 flex flex-col gap-8">
-            <div className={`${darkMode ? 'bg-black border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8 h-full`}>
+            <div className={`${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8 h-full`}>
               <h2 className={`text-xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'} flex items-center gap-2`}>
                 <span className={`material-symbols-outlined ${darkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>analytics</span>
                 Activity Summary
               </h2>
               <div className="space-y-4">
-                <div className={`flex items-center justify-between p-4 ${darkMode ? 'bg-black border-[#333333] hover:border-primary' : 'bg-white border-[#E0E0E0] hover:border-primary'} border transition-colors cursor-pointer group`}>
+                <div className={`flex items-center justify-between p-4 ${darkMode ? 'bg-gray-900 border-[#333333] hover:border-primary' : 'bg-white border-[#E0E0E0] hover:border-primary'} border transition-colors cursor-pointer group`}>
                   <span className={darkMode ? 'text-white' : 'text-black font-medium'}>Forum Posts</span>
                   <span className={`${darkMode ? 'bg-[#333333] text-white' : 'bg-black text-white'} px-3 py-1 text-sm font-bold`}>
                     {activitySummary.forumPosts}
                   </span>
                 </div>
-                <div className={`flex items-center justify-between p-4 ${darkMode ? 'bg-black border-[#333333] hover:border-primary' : 'bg-white border-[#E0E0E0] hover:border-primary'} border transition-colors cursor-pointer group`}>
+                <div className={`flex items-center justify-between p-4 ${darkMode ? 'bg-gray-900 border-[#333333] hover:border-primary' : 'bg-white border-[#E0E0E0] hover:border-primary'} border transition-colors cursor-pointer group`}>
                   <span className={darkMode ? 'text-white' : 'text-black font-medium'}>Mood Tracking</span>
                   <span className={`bg-primary text-white px-3 py-1 text-sm font-bold`}>
                     {activitySummary.moodTracking}
                   </span>
                 </div>
-                <div className={`flex items-center justify-between p-4 ${darkMode ? 'bg-black border-[#333333] hover:border-primary opacity-60 hover:opacity-100' : 'bg-white border-[#E0E0E0] hover:border-primary opacity-70 hover:opacity-100'} border transition-colors cursor-pointer group`}>
+                <div className={`flex items-center justify-between p-4 ${darkMode ? 'bg-gray-900 border-[#333333] hover:border-primary opacity-60 hover:opacity-100' : 'bg-white border-[#E0E0E0] hover:border-primary opacity-70 hover:opacity-100'} border transition-colors cursor-pointer group`}>
                   <span className={darkMode ? 'text-white' : 'text-black font-medium'}>Consultations</span>
                   <span className={`${darkMode ? 'bg-[#222] text-gray-400' : 'bg-gray-200 text-gray-500'} px-3 py-1 text-sm font-bold`}>
                     {activitySummary.consultations}
@@ -383,13 +391,13 @@ const Progress = () => {
         {/* Mood Trends and Recent History */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Mood Trends Chart */}
-          <div className={`lg:col-span-2 ${darkMode ? 'bg-black border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8`}>
+          <div className={`lg:col-span-2 ${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8`}>
             <div className="flex items-center justify-between mb-6">
               <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Mood Trends</h2>
               <select 
                 value={timeRange}
                 onChange={(e) => setTimeRange(e.target.value)}
-                className={`${darkMode ? 'bg-black text-white border-[#333333]' : 'bg-white text-black border-[#E0E0E0]'} text-sm border p-1 outline-none focus:border-primary`}
+                className={`${darkMode ? 'bg-gray-900 text-white border-[#333333]' : 'bg-white text-black border-[#E0E0E0]'} text-sm border p-1 outline-none focus:border-primary`}
               >
                 <option value="7">Last 7 Days</option>
                 <option value="30">Last 30 Days</option>
@@ -401,7 +409,7 @@ const Progress = () => {
           </div>
 
           {/* Recent Mood History */}
-          <div className={`lg:col-span-1 ${darkMode ? 'bg-black border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8 flex flex-col`}>
+          <div className={`lg:col-span-1 ${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8 flex flex-col`}>
             <h2 className={`text-xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'}`}>Recent Mood History</h2>
             <div className="space-y-0 flex-grow">
               {moodHistory.slice(0, 3).map((entry, index) => (
@@ -439,7 +447,7 @@ const Progress = () => {
         </div>
 
         {/* Screening History */}
-        <div className={`${darkMode ? 'bg-black border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8`}>
+        <div className={`${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8`}>
           <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'} flex items-center gap-3`}>
             <span className={`material-symbols-outlined ${darkMode ? 'text-accent-teal' : 'text-black'}`}>assignment_turned_in</span>
             Screening History
