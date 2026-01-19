@@ -771,18 +771,17 @@ const Dashboard = () => {
       <div className="fixed bottom-8 right-8 flex flex-col gap-4 z-40 items-end">
         {/* AI Support Assistant Button */}
         <button 
-          className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-cyan-500 hover:brightness-110 text-white pl-4 pr-6 py-4 rounded-full shadow-lg shadow-purple-500/40 transition-all hover:scale-105"
+          className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:brightness-110 text-white shadow-lg shadow-purple-500/40 transition-all hover:scale-110"
           onClick={() => navigate('/ai-chat')}
+          title="AI Support Chat"
         >
-          <div className="bg-white/20 p-1 rounded-full">
-            <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-          </div>
-          <div className="flex flex-col items-start">
-            <span className="text-xs font-bold text-white/80 uppercase tracking-wider">Ask AI</span>
-            <span className="font-bold text-sm">Support Assistant</span>
-          </div>
+          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C8.69 2 6 4.69 6 8c0 1.1.27 2.14.75 3.05L3 18l6.95-3.75c.91.48 1.95.75 3.05.75 3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>
+            <circle cx="10" cy="8" r="1"/>
+            <circle cx="14" cy="8" r="1"/>
+            <path d="M9 11h6v1.5H9z"/>
+            <path d="M12 1.5v2M7 3.5l1.5-1.5M17 3.5l-1.5-1.5"/>
+          </svg>
         </button>
 
         {/* Emergency Button */}
