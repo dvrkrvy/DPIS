@@ -448,8 +448,8 @@ const ScreeningTest = () => {
 
   return (
     <div className={`min-h-screen ${bgMain} ${textMain} transition-colors`}>
-      <main className="pt-28 pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto min-h-[calc(100vh-80px)] flex flex-col justify-center">
-        <div className={`reveal-up relative ${darkMode ? 'bg-gray-900' : 'bg-white'} ${darkMode ? 'border-white/10' : 'border-gray-200'} border rounded-3xl p-8 md:p-12 shadow-2xl ${darkMode ? 'shadow-purple-500/5' : 'shadow-lg'} overflow-hidden backdrop-blur-sm`}>
+      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto min-h-[calc(100vh-80px)] flex flex-col justify-center">
+        <div className={`reveal-up relative ${darkMode ? 'bg-gray-900' : 'bg-white'} ${darkMode ? 'border-white/10' : 'border-gray-200'} border rounded-2xl p-6 md:p-8 shadow-2xl ${darkMode ? 'shadow-purple-500/5' : 'shadow-lg'} overflow-hidden backdrop-blur-sm`}>
           {/* Background gradient effects */}
           {darkMode && (
             <>
@@ -458,13 +458,13 @@ const ScreeningTest = () => {
             </>
           )}
 
-          <div className="relative z-10 space-y-6 mb-12">
+          <div className="relative z-10 space-y-4 mb-8">
             <div className="flex justify-between items-end">
-              <div className="flex flex-col gap-1">
-                <h2 className={`text-xl font-bold ${textMain} tracking-tight`}>{test.name}</h2>
-                <span className={`text-xs font-mono ${textSecondary} tracking-wider uppercase`}>Standardized Screening Protocol</span>
+              <div className="flex flex-col gap-0.5">
+                <h2 className={`text-lg font-bold ${textMain} tracking-tight`}>{test.name}</h2>
+                <span className={`text-[10px] font-mono ${textSecondary} tracking-wider uppercase`}>Standardized Screening Protocol</span>
               </div>
-              <span className={`text-sm font-mono font-bold px-3 py-1 rounded border ${
+              <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded border ${
                 darkMode 
                   ? 'text-purple-400 bg-purple-500/10 border-purple-500/20' 
                   : 'text-purple-600 bg-purple-50 border-purple-200'
@@ -484,8 +484,8 @@ const ScreeningTest = () => {
             </div>
           </div>
 
-          <div className="relative z-10 mb-12">
-            <h1 className={`text-3xl md:text-5xl lg:text-6xl font-bold ${textMain} leading-tight mb-4`}>
+          <div className="relative z-10 mb-8">
+            <h1 className={`text-2xl md:text-3xl lg:text-4xl font-bold ${textMain} leading-tight mb-3`}>
               {question.text.split(' ').map((word, idx) => {
                 // Highlight certain words with gradient
                 const highlightWords = ['doing', 'things', 'feeling', 'trouble', 'feeling'];
@@ -504,19 +504,19 @@ const ScreeningTest = () => {
                 );
               })}
             </h1>
-            <p className={`${textSecondary} text-lg font-light`}>
+            <p className={`${textSecondary} text-base font-light`}>
               Over the last 2 weeks, how often have you been bothered by this problem?
             </p>
           </div>
 
-          <div className="relative z-10 grid grid-cols-1 gap-4">
+          <div className="relative z-10 grid grid-cols-1 gap-3">
             {[0, 1, 2, 3].map(value => {
               const isSelected = responses[question.id] === value;
               return (
                 <button
                   key={value}
                   onClick={() => handleResponse(question.id, value)}
-                  className={`group relative w-full text-left p-6 rounded-xl border transition-all duration-200 ease-out transform hover:-translate-y-1 ${
+                  className={`group relative w-full text-left p-4 rounded-lg border transition-all duration-200 ease-out transform hover:-translate-y-0.5 ${
                     isSelected
                       ? darkMode
                         ? 'bg-white border-white text-black'
@@ -527,7 +527,7 @@ const ScreeningTest = () => {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-lg md:text-xl font-medium transition-colors ${
+                    <span className={`text-base md:text-lg font-medium transition-colors ${
                       isSelected
                         ? darkMode ? 'text-black' : 'text-white'
                         : darkMode ? 'text-gray-300 group-hover:text-black' : 'text-black group-hover:text-white'
@@ -551,17 +551,17 @@ const ScreeningTest = () => {
             })}
           </div>
 
-          <div className={`relative z-10 flex justify-between items-center mt-12 pt-8 border-t ${darkMode ? 'border-white/5' : 'border-gray-200'}`}>
+          <div className={`relative z-10 flex justify-between items-center mt-8 pt-6 border-t ${darkMode ? 'border-white/5' : 'border-gray-200'}`}>
             <button
               onClick={handlePrevious}
               disabled={currentQuestion === 0}
-              className={`group flex items-center gap-2 px-6 py-3 rounded-lg border font-medium transition-all ${
+              className={`group flex items-center gap-2 px-5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
                 darkMode
                   ? 'border-white/10 text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed'
                   : 'border-gray-300 text-gray-600 hover:text-black hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed'
               }`}
             >
-              <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Previous
@@ -570,14 +570,14 @@ const ScreeningTest = () => {
               <button
                 onClick={handleSubmit}
                 disabled={loading || responses[question.id] === undefined}
-                className={`group flex items-center gap-2 px-8 py-3.5 rounded-lg font-bold shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`group flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
                   darkMode
                     ? 'bg-white text-black hover:bg-gray-200 shadow-white/20 hover:shadow-white/40'
                     : 'bg-black text-white hover:bg-gray-900 shadow-xl hover:shadow-2xl'
                 }`}
               >
                 {loading ? 'Submitting...' : 'Submit Assessment'}
-                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </button>
@@ -585,14 +585,14 @@ const ScreeningTest = () => {
               <button
                 onClick={handleNext}
                 disabled={responses[question.id] === undefined}
-                className={`group flex items-center gap-2 px-8 py-3.5 rounded-lg font-bold shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`group flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold shadow-lg transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${
                   darkMode
                     ? 'bg-white text-black hover:bg-gray-200 shadow-white/20 hover:shadow-white/40'
                     : 'bg-black text-white hover:bg-gray-900 shadow-xl hover:shadow-2xl'
                 }`}
               >
                 Next Question
-                <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
