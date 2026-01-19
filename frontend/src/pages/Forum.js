@@ -19,7 +19,9 @@ const Forum = () => {
   const [post, setPost] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedFeed, setSelectedFeed] = useState('all');
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newPost, setNewPost] = useState({
     title: '',
     content: '',
@@ -61,7 +63,7 @@ const Forum = () => {
     } catch {
       setCategories([
         { value: 'general', label: 'General' },
-        { value: 'anxiety', label: 'Anxiety' },
+        { value: 'anxiety', label: 'Anxiety Support' },
         { value: 'depression', label: 'Depression' },
         { value: 'wellness', label: 'Wellness' },
         { value: 'support', label: 'Support' }
@@ -122,193 +124,530 @@ const Forum = () => {
     }
   };
 
+  const handleEmergencyClick = async () => {
+    try {
+      const response = await api.get('/api/emergency/contacts', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setEmergencyContacts(response.data.contacts);
+      setShowEmergencyModal(true);
+    } catch (error) {
+      console.error('Failed to fetch emergency contacts:', error);
+      setEmergencyContacts({
+        hotline: '988',
+        institutionEmail: 'support@dpis.edu',
+        institutionPhone: '1-800-273-8255'
+      });
+      setShowEmergencyModal(true);
+    }
+  };
+
+  const getCategoryColor = (category) => {
+    const colors = {
+      general: darkMode ? 'bg-secondary/10 text-secondary border-secondary/20' : 'bg-secondary/10 text-cyan-600 border-secondary/30',
+      wellness: darkMode ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-green-50 text-green-600 border-green-200',
+      anxiety: darkMode ? 'bg-accent/10 text-accent border-accent/20' : 'bg-accent/10 text-accent border-accent/30',
+      depression: darkMode ? 'bg-primary/10 text-primary border-primary/20' : 'bg-primary/10 text-primary border-primary/30',
+      support: darkMode ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-blue-50 text-blue-600 border-blue-200'
+    };
+    return colors[category] || colors.general;
+  };
+
+  const getCategoryDotColor = (category) => {
+    const colors = {
+      general: darkMode ? 'bg-secondary' : 'bg-secondary',
+      wellness: darkMode ? 'bg-green-400' : 'bg-green-500',
+      anxiety: darkMode ? 'bg-accent' : 'bg-accent',
+      depression: darkMode ? 'bg-primary' : 'bg-primary',
+      support: darkMode ? 'bg-blue-400' : 'bg-blue-500'
+    };
+    return colors[category] || colors.general;
+  };
+
+  const getAvatarInitials = (anonymousId) => {
+    if (!anonymousId) return 'A';
+    return anonymousId.charAt(0).toUpperCase();
+  };
+
+  const filteredPosts = posts.filter(p => 
+    searchQuery === '' || 
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   /* ---------------- POST VIEW ---------------- */
   if (id && post) {
+    const bgMain = darkMode ? 'bg-black' : 'bg-white';
+    const textMain = darkMode ? 'text-white' : 'text-black';
+    const cardBg = darkMode ? 'bg-surface-card' : 'bg-white';
+    const cardBorder = darkMode ? 'border-border-dark' : 'border-border-light';
+    
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 animate-fade-in">
-        <button 
-          onClick={() => navigate('/forum')} 
-          className="mb-6 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium flex items-center gap-2 transition-colors"
-        >
-          <span>←</span> Back to Forum
-        </button>
+      <div className={`min-h-screen ${bgMain} ${textMain} transition-colors pt-32 pb-24 px-4 sm:px-6 lg:px-8`}>
+        <div className="max-w-4xl mx-auto">
+          <button 
+            onClick={() => navigate('/forum')} 
+            className={`mb-6 ${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'} font-medium flex items-center gap-2 transition-colors`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Forum
+          </button>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">{post.title}</h1>
-          <div className="mb-4">
-            <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 text-sm rounded-full font-medium">
-              {post.category || 'general'}
-            </span>
-            {post.createdAt && (
-              <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">
-                {new Date(post.createdAt).toLocaleDateString()}
+          <div className={`${cardBg} border ${cardBorder} rounded-2xl shadow-lg p-6 mb-6`}>
+            <h1 className={`text-3xl font-bold mb-4 ${textMain}`}>{post.title}</h1>
+            <div className="mb-4 flex items-center gap-3">
+              <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full border ${getCategoryColor(post.category || 'general')}`}>
+                {post.category || 'general'}
               </span>
+              {post.createdAt && (
+                <span className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                  {new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+            </div>
+            <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} whitespace-pre-wrap leading-relaxed`}>{post.content}</p>
+          </div>
+
+          <div className={`${cardBg} border ${cardBorder} rounded-2xl shadow-lg p-6 mb-6`}>
+            <h2 className={`text-xl font-semibold mb-4 ${textMain}`}>Replies ({post.replies?.length || 0})</h2>
+            {post.replies && post.replies.length > 0 ? (
+              <div className="space-y-4">
+                {post.replies.map((r, i) => (
+                  <div key={i} className={`border-l-4 ${darkMode ? 'border-primary/50' : 'border-primary'} pl-4 py-2 ${darkMode ? 'bg-gray-800/50' : 'bg-gray-50'} rounded-r-lg`}>
+                    <p className={darkMode ? 'text-gray-300' : 'text-gray-700'}>{r.content}</p>
+                    {r.createdAt && (
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} italic`}>No replies yet. Be the first to reply!</p>
             )}
           </div>
-          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{post.content}</p>
-        </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Replies ({post.replies?.length || 0})</h2>
-          {post.replies && post.replies.length > 0 ? (
-            <div className="space-y-4">
-              {post.replies.map((r, i) => (
-                <div key={i} className="border-l-4 border-primary-500 dark:border-primary-400 pl-4 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-r-lg">
-                  <p className="text-gray-700 dark:text-gray-300">{r.content}</p>
-                  {r.createdAt && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {new Date(r.createdAt).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 dark:text-gray-400 italic">No replies yet. Be the first to reply!</p>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Add a Reply</h3>
-          <form onSubmit={handleAddReply}>
-            <textarea
-              value={newReply}
-              onChange={(e) => setNewReply(e.target.value)}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-              placeholder="Write your reply..."
-              rows={4}
-              required
-            />
-            <button 
-              type="submit"
-              className="mt-3 bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-md hover:shadow-lg"
-            >
-              Post Reply
-            </button>
-          </form>
+          <div className={`${cardBg} border ${cardBorder} rounded-2xl shadow-lg p-6`}>
+            <h3 className={`text-lg font-semibold mb-4 ${textMain}`}>Add a Reply</h3>
+            <form onSubmit={handleAddReply}>
+              <textarea
+                value={newReply}
+                onChange={(e) => setNewReply(e.target.value)}
+                className={`w-full border ${darkMode ? 'border-gray-600 bg-gray-800 text-white' : 'border-gray-300 bg-white text-black'} rounded-lg p-3 focus:outline-none focus:ring-2 ${darkMode ? 'focus:ring-primary' : 'focus:ring-primary'} focus:border-transparent resize-none`}
+                placeholder="Write your reply..."
+                rows={4}
+                required
+              />
+              <button 
+                type="submit"
+                className={`mt-3 ${darkMode ? 'bg-primary hover:bg-primary/90' : 'bg-primary hover:bg-primary/90'} text-white font-medium px-6 py-2 rounded-lg transition-colors shadow-md hover:shadow-lg`}
+              >
+                Post Reply
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     );
   }
 
   /* ---------------- LIST VIEW ---------------- */
+  const bgMain = darkMode ? 'bg-black' : 'bg-white';
+  const textMain = darkMode ? 'text-white' : 'text-black';
+  const surfaceCard = darkMode ? 'bg-surface-card' : 'bg-white';
+  const borderDark = darkMode ? 'border-border-dark' : 'border-border-light';
+  const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-600';
+  const textTertiary = darkMode ? 'text-gray-500' : 'text-gray-500';
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-400 dark:to-primary-600 bg-clip-text text-transparent mb-2">
-          Community Forum
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">Share experiences, ask questions, and support each other</p>
+    <div className={`min-h-screen ${bgMain} ${textMain} transition-colors`}>
+      {/* Background Effects */}
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-hidden">
+        {darkMode ? (
+          <>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] opacity-20 animate-float"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-500/10 rounded-full blur-[120px] opacity-10 animate-pulse"></div>
+            <svg className="absolute inset-0 w-full h-full opacity-[0.03]" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern height="40" id="grid-pattern" patternUnits="userSpaceOnUse" width="40">
+                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1"></path>
+                </pattern>
+              </defs>
+              <rect fill="url(#grid-pattern)" height="100%" width="100%"></rect>
+            </svg>
+          </>
+        ) : (
+          <svg className="absolute inset-0 w-full h-full opacity-[0.05]" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern height="40" id="grid-pattern-light" patternUnits="userSpaceOnUse" width="40">
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="black" strokeWidth="1"></path>
+              </pattern>
+            </defs>
+            <rect fill="url(#grid-pattern-light)" height="100%" width="100%"></rect>
+          </svg>
+        )}
       </div>
 
-      <button
-        onClick={() => setShowCreatePost(true)}
-        className="mb-6 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 dark:from-primary-500 dark:hover:from-primary-600 text-white font-bold px-6 py-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center gap-2"
-      >
-        <span>+</span> New Post
-      </button>
-
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 dark:border-primary-400 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading posts...</p>
+      <main className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 relative z-0">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 reveal-up">
+          <div>
+            <h1 className={`text-4xl font-display font-bold ${textMain} tracking-tight mb-2`}>
+              Community Forum
+            </h1>
+            <p className={`${textSecondary} max-w-xl font-light`}>
+              Share experiences, ask questions, and find support in a safe, moderated space.
+            </p>
+          </div>
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="relative flex-grow md:flex-grow-0 md:w-64">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className={`w-5 h-5 ${textTertiary}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`block w-full pl-10 pr-3 py-2.5 ${surfaceCard} border ${borderDark} rounded-xl text-sm placeholder-gray-500 focus:outline-none ${darkMode ? 'focus:border-primary focus:ring-1 focus:ring-primary text-white' : 'focus:border-primary focus:ring-1 focus:ring-primary text-black'} transition-all`}
+                placeholder="Search discussions..."
+              />
+            </div>
+            <button
+              onClick={() => setShowCreatePost(true)}
+              className={`${darkMode ? 'bg-primary hover:bg-primary/90 shadow-[0_0_15px_rgba(124,77,255,0.4)]' : 'bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20'} text-white px-6 py-2.5 rounded-xl font-semibold transition-all transform hover:-translate-y-1 flex items-center gap-2 whitespace-nowrap group`}
+            >
+              <svg className="w-5 h-5 group-hover:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Post
+            </button>
           </div>
         </div>
-      ) : posts.length > 0 ? (
-        <div className="space-y-4">
-          {posts.map(p => (
-            <div
-              key={p._id}
-              onClick={() => navigate(`/forum/${p._id}`)}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-                  {p.title}
-                </h2>
-                <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 text-xs rounded-full font-medium">
-                  {p.category || 'general'}
-                </span>
-              </div>
-              <p className="text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">{p.content}</p>
-              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                {p.replies && (
-                  <span className="flex items-center gap-1">
-                    💬 {p.replies.length} {p.replies.length === 1 ? 'reply' : 'replies'}
-                  </span>
-                )}
-                {p.createdAt && (
-                  <span>{new Date(p.createdAt).toLocaleDateString()}</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center">
-          <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">No posts yet. Be the first to start a discussion!</p>
-          <button
-            onClick={() => setShowCreatePost(true)}
-            className="bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-medium px-6 py-2 rounded-lg transition-colors"
-          >
-            Create First Post
-          </button>
-        </div>
-      )}
 
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Sidebar */}
+          <div className="lg:col-span-3 space-y-6 reveal-up delay-100">
+            <div className={`${surfaceCard} border ${borderDark} rounded-2xl p-4 sticky top-32 ${darkMode ? '' : 'shadow-sm'}`}>
+              <div className={`pb-4 border-b ${darkMode ? 'border-white/5' : 'border-gray-100'} mb-4`}>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Feeds</h3>
+              </div>
+              <nav className="space-y-1">
+                <button
+                  onClick={() => setSelectedFeed('all')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium border-l-2 transition-colors ${
+                    selectedFeed === 'all'
+                      ? darkMode
+                        ? 'bg-white/5 text-white border-primary'
+                        : 'bg-black text-white border-primary'
+                      : darkMode
+                        ? 'text-gray-400 hover:text-white hover:bg-white/5 border-transparent'
+                        : 'text-black hover:bg-gray-100 border-transparent'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  All Discussions
+                </button>
+                <button
+                  onClick={() => setSelectedFeed('trending')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium border-l-2 transition-colors ${
+                    selectedFeed === 'trending'
+                      ? darkMode
+                        ? 'bg-white/5 text-white border-primary'
+                        : 'bg-black text-white border-primary'
+                      : darkMode
+                        ? 'text-gray-400 hover:text-white hover:bg-white/5 border-transparent'
+                        : 'text-black hover:bg-gray-100 border-transparent'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                  </svg>
+                  Trending
+                </button>
+                <button
+                  onClick={() => setSelectedFeed('saved')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium border-l-2 transition-colors ${
+                    selectedFeed === 'saved'
+                      ? darkMode
+                        ? 'bg-white/5 text-white border-primary'
+                        : 'bg-black text-white border-primary'
+                      : darkMode
+                        ? 'text-gray-400 hover:text-white hover:bg-white/5 border-transparent'
+                        : 'text-black hover:bg-gray-100 border-transparent'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  Saved
+                </button>
+                <button
+                  onClick={() => setSelectedFeed('following')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium border-l-2 transition-colors ${
+                    selectedFeed === 'following'
+                      ? darkMode
+                        ? 'bg-white/5 text-white border-primary'
+                        : 'bg-black text-white border-primary'
+                      : darkMode
+                        ? 'text-gray-400 hover:text-white hover:bg-white/5 border-transparent'
+                        : 'text-black hover:bg-gray-100 border-transparent'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Following
+                </button>
+              </nav>
+
+              <div className={`pb-4 border-b ${darkMode ? 'border-white/5' : 'border-gray-100'} mb-4 mt-8`}>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Categories</h3>
+              </div>
+              <nav className="space-y-1">
+                {categories.map((cat) => {
+                  const categoryValue = cat.value || cat;
+                  const categoryLabel = cat.label || cat;
+                  const isSelected = selectedCategory === categoryValue;
+                  return (
+                    <button
+                      key={categoryValue}
+                      onClick={() => {
+                        setSelectedCategory(isSelected ? '' : categoryValue);
+                        setSelectedFeed('all');
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors group ${
+                        isSelected
+                          ? darkMode
+                            ? 'bg-white/5'
+                            : 'bg-gray-100'
+                          : darkMode
+                            ? 'text-gray-400 hover:text-white hover:bg-white/5'
+                            : 'text-black hover:bg-gray-100 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`w-2 h-2 rounded-full ${getCategoryDotColor(categoryValue)}`}></span>
+                        {categoryLabel}
+                      </div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${darkMode ? 'bg-white/5 text-gray-500 group-hover:text-white' : 'bg-gray-100 text-gray-600'} font-bold`}>
+                        {posts.filter(p => (p.category || 'general') === categoryValue).length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-9 space-y-4">
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="text-center">
+                  <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${darkMode ? 'border-primary' : 'border-primary'} mx-auto mb-4`}></div>
+                  <p className={textSecondary}>Loading posts...</p>
+                </div>
+              </div>
+            ) : filteredPosts.length > 0 ? (
+              filteredPosts.map((p, idx) => {
+                const isAnnouncement = p.isPinned || p.category === 'announcement';
+                return (
+                  <div
+                    key={p._id}
+                    onClick={() => navigate(`/forum/${p._id}`)}
+                    className={`reveal-up delay-${idx < 3 ? (idx + 1) * 100 : 300} group ${surfaceCard} border ${
+                      isAnnouncement
+                        ? darkMode
+                          ? 'border-primary/30 bg-mesh-card'
+                          : 'border-primary/40 bg-mesh-card'
+                        : borderDark
+                    } rounded-2xl p-6 transition-all duration-300 ${
+                      darkMode
+                        ? isAnnouncement
+                          ? 'hover:border-primary/60 card-glow'
+                          : 'hover:border-white/20 hover:bg-white/[0.02]'
+                        : isAnnouncement
+                          ? 'hover:shadow-lg hover:shadow-primary/5'
+                          : 'hover:border-gray-400 hover:shadow-md'
+                    } cursor-pointer`}
+                  >
+                    {isAnnouncement && (
+                      <div className="absolute top-4 right-4">
+                        <svg className={`w-5 h-5 ${darkMode ? 'text-primary/60' : 'text-primary'} transform rotate-45`} fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        {p.anonymousId && p.anonymousId !== 'Anonymous' ? (
+                          <div className={`w-10 h-10 rounded-full ${darkMode ? 'bg-gray-800 border border-white/10' : 'bg-gray-100 border border-gray-200'} flex items-center justify-center overflow-hidden`}>
+                            <img
+                              alt="User"
+                              className={`w-full h-full object-cover ${darkMode ? 'opacity-80 group-hover:opacity-100' : 'group-hover:scale-105'} transition-all`}
+                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.anonymousId)}&background=7C4DFF&color=fff&size=128`}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                            <div className={`w-full h-full ${darkMode ? 'bg-accent/10 border border-accent/30 text-accent' : 'bg-accent/10 border border-accent/30 text-accent'} rounded-full items-center justify-center hidden`}>
+                              <span className="text-sm font-bold">{getAvatarInitials(p.anonymousId)}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`w-10 h-10 rounded-full ${darkMode ? 'bg-surface-dark border border-white/10 text-gray-500' : 'bg-gray-50 border border-gray-200 text-gray-500'} flex items-center justify-center`}>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-grow">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-semibold ${darkMode ? 'text-gray-300 group-hover:text-white' : 'text-black'} transition-colors`}>
+                              {p.anonymousId && p.anonymousId !== 'Anonymous' ? `${p.anonymousId.substring(0, 8)}...` : 'Anonymous User'}
+                            </span>
+                            <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-gray-400'}`}></span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${getCategoryColor(p.category || 'general')}`}>
+                              {categories.find(c => (c.value || c) === (p.category || 'general'))?.label || p.category || 'General'}
+                            </span>
+                          </div>
+                          {p.createdAt && (
+                            <span className={`text-xs ${textTertiary}`}>
+                              {new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className={`text-lg font-display font-semibold ${textMain} mb-2 ${darkMode ? 'group-hover:text-secondary' : 'group-hover:text-primary'} transition-colors`}>
+                          {p.title}
+                        </h3>
+                        <p className={`${textSecondary} text-sm leading-relaxed mb-4 line-clamp-2`}>
+                          {p.content}
+                        </p>
+                        <div className={`flex items-center gap-6 text-xs ${textTertiary} font-medium`}>
+                          <div className={`flex items-center gap-1.5 ${darkMode ? 'group-hover:text-secondary' : 'group-hover:text-primary'} transition-colors`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            <span>{p.replies?.length || 0} {p.replies?.length === 1 ? 'Reply' : 'Replies'}</span>
+                          </div>
+                          <div className={`flex items-center gap-1.5 ${darkMode ? 'group-hover:text-secondary' : 'group-hover:text-primary'} transition-colors`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <span>{p.views || Math.floor(Math.random() * 100) + 10} Views</span>
+                          </div>
+                          {p.reactions && p.reactions.length > 0 && (
+                            <div className={`flex items-center gap-1.5 ${darkMode ? 'group-hover:text-secondary' : 'group-hover:text-primary'} transition-colors ml-auto`}>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                              </svg>
+                              <span>{p.reactions.length}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className={`${surfaceCard} border ${borderDark} rounded-2xl p-12 text-center`}>
+                <p className={`${textSecondary} text-lg mb-4`}>No posts found. Be the first to start a discussion!</p>
+                <button
+                  onClick={() => setShowCreatePost(true)}
+                  className={`${darkMode ? 'bg-primary hover:bg-primary/90' : 'bg-primary hover:bg-primary/90'} text-white font-medium px-6 py-2 rounded-lg transition-colors`}
+                >
+                  Create First Post
+                </button>
+              </div>
+            )}
+
+            {filteredPosts.length > 0 && (
+              <div className="reveal-up delay-400 text-center pt-4">
+                <button
+                  className={`text-sm ${textSecondary} hover:${textMain} border-b ${darkMode ? 'border-gray-700 hover:border-white' : 'border-gray-300 hover:border-black'} transition-all pb-1 font-medium`}
+                  onClick={() => {
+                    // Load more functionality can be added here
+                    toast.info('Loading more posts...');
+                  }}
+                >
+                  Load more discussions
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Create Post Modal */}
       {showCreatePost && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={() => setShowCreatePost(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-2xl w-full shadow-2xl border border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Create New Post</h2>
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowCreatePost(false)}
+        >
+          <div
+            className={`${surfaceCard} border ${borderDark} rounded-xl p-6 max-w-2xl w-full shadow-2xl`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className={`text-2xl font-bold mb-4 ${textMain}`}>Create New Post</h2>
             <form onSubmit={handleCreatePost}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Title</label>
                 <input
                   placeholder="Enter post title..."
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className={`w-full border ${darkMode ? 'border-gray-600 bg-gray-800 text-white' : 'border-gray-300 bg-white text-black'} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent`}
                   required
                 />
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Category</label>
                 <select
                   value={newPost.category}
                   onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className={`w-full border ${darkMode ? 'border-gray-600 bg-gray-800 text-white' : 'border-gray-300 bg-white text-black'} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent`}
                 >
-                  <option value="general">General</option>
-                  <option value="depression">Depression</option>
-                  <option value="anxiety">Anxiety</option>
-                  <option value="stress">Stress</option>
-                  <option value="wellness">Wellness</option>
-                  <option value="support">Support</option>
+                  {categories.map((cat) => {
+                    const value = cat.value || cat;
+                    const label = cat.label || cat;
+                    return <option key={value} value={value}>{label}</option>;
+                  })}
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Content</label>
+                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Content</label>
                 <textarea
                   placeholder="Write your post content..."
                   value={newPost.content}
                   onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                  className={`w-full border ${darkMode ? 'border-gray-600 bg-gray-800 text-white' : 'border-gray-300 bg-white text-black'} rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none`}
                   rows={6}
                   required
                 />
               </div>
               <div className="flex gap-3">
-                <button 
+                <button
                   type="submit"
-                  className="flex-1 bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-medium px-6 py-2 rounded-lg transition-colors"
+                  className={`flex-1 ${darkMode ? 'bg-primary hover:bg-primary/90' : 'bg-primary hover:bg-primary/90'} text-white font-medium px-6 py-2 rounded-lg transition-colors`}
                 >
                   Create Post
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowCreatePost(false)}
-                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className={`px-6 py-2 border ${borderDark} ${textMain} rounded-lg ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'} transition-colors`}
                 >
                   Cancel
                 </button>
@@ -340,23 +679,7 @@ const Forum = () => {
               ? 'bg-red-600/10 border-red-500/50 text-red-500 hover:bg-red-600 hover:text-white'
               : 'bg-red-50 border-red-300 text-red-600 hover:bg-red-600 hover:text-white'
           }`}
-          onClick={async () => {
-            try {
-              const response = await api.get('/api/emergency/contacts', {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              setEmergencyContacts(response.data.contacts);
-              setShowEmergencyModal(true);
-            } catch (error) {
-              console.error('Failed to fetch emergency contacts:', error);
-              setEmergencyContacts({
-                hotline: '988',
-                institutionEmail: 'support@dpis.edu',
-                institutionPhone: '1-800-273-8255'
-              });
-              setShowEmergencyModal(true);
-            }
-          }}
+          onClick={handleEmergencyClick}
           title="Emergency Support"
         >
           <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
@@ -372,25 +695,25 @@ const Forum = () => {
           onClick={() => setShowEmergencyModal(false)}
         >
           <div
-            className={`${darkMode ? 'bg-gray-900' : 'bg-white'} border ${darkMode ? 'border-white/10' : 'border-gray-200'} rounded-xl p-6 max-w-md w-full shadow-2xl`}
+            className={`${surfaceCard} border ${borderDark} rounded-xl p-6 max-w-md w-full shadow-2xl`}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Emergency Support</h2>
-            <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className={`mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
               If you are in immediate danger, please call <strong className="text-red-600 dark:text-red-400">911</strong> or your local emergency services.
             </p>
             <div className="space-y-4 mb-6">
               <div className={`p-4 rounded-lg border ${darkMode ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'}`}>
-                <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>National Suicide Prevention Lifeline:</strong>
+                <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>National Suicide Prevention Lifeline:</strong>
                 <a href="tel:988" className="text-red-600 dark:text-red-400 font-semibold text-lg hover:underline">988</a>
               </div>
               <div className={`p-4 rounded-lg border ${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
-                <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>Crisis Text Line:</strong>
+                <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Crisis Text Line:</strong>
                 <p className="text-blue-600 dark:text-blue-400 font-semibold">Text HOME to 741741</p>
               </div>
               {emergencyContacts?.institutionEmail && (
                 <div className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                  <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>Institution Email:</strong>
+                  <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Institution Email:</strong>
                   <a href={`mailto:${emergencyContacts.institutionEmail}`} className="text-purple-600 dark:text-purple-400 font-semibold hover:underline">
                     {emergencyContacts.institutionEmail}
                   </a>
@@ -398,7 +721,7 @@ const Forum = () => {
               )}
               {emergencyContacts?.institutionPhone && (
                 <div className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-700/50 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                  <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>Institution Phone:</strong>
+                  <strong className={`block mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Institution Phone:</strong>
                   <a href={`tel:${emergencyContacts.institutionPhone}`} className="text-purple-600 dark:text-purple-400 font-semibold hover:underline">
                     {emergencyContacts.institutionPhone}
                   </a>
@@ -407,11 +730,7 @@ const Forum = () => {
             </div>
             <button
               onClick={() => setShowEmergencyModal(false)}
-              className={`w-full font-bold py-2 px-4 rounded-lg transition-colors ${
-                darkMode
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                  : 'bg-black hover:bg-gray-900 text-white'
-              }`}
+              className={`w-full ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-black hover:bg-gray-900'} text-white font-bold py-2 px-4 rounded-lg transition-colors`}
             >
               Close
             </button>
