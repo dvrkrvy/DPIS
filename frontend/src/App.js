@@ -25,9 +25,9 @@ function AIChatButton() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Hide on public auth pages (onboarding/login) AND on dashboard (has its own buttons)
+  // Hide on public auth pages (onboarding/login) AND on pages that have their own buttons (dashboard, screening)
   const pathname = location.pathname;
-  if (pathname === '/onboarding' || pathname === '/admin/login' || pathname === '/' || pathname === '' || pathname === '/dashboard') {
+  if (pathname === '/onboarding' || pathname === '/admin/login' || pathname === '/' || pathname === '' || pathname === '/dashboard' || pathname === '/screening') {
     return null;
   }
 
@@ -49,8 +49,8 @@ function AppContent() {
   const { darkMode } = useTheme();
   const location = useLocation();
   
-  // Don't show old floating buttons on dashboard - it has new ones
-  const showOldButtons = location.pathname !== '/dashboard';
+  // Don't show old floating buttons on pages that have their own buttons
+  const showOldButtons = location.pathname !== '/dashboard' && location.pathname !== '/screening';
 
   return (
     <div className={`min-h-screen transition-colors duration-200 ${
