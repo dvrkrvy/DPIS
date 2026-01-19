@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -8,7 +7,6 @@ import toast from 'react-hot-toast';
 const AIChat = () => {
   const { token } = useAuth();
   const { darkMode } = useTheme();
-  const navigate = useNavigate();
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState(null);
   const [messages, setMessages] = useState([
