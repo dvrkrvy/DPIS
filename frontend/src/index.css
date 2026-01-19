@@ -176,6 +176,59 @@ input[type="date"] {
   color-scheme: dark;
 }
 
+/* Range slider styling for Progress page */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 24px;
+  width: 24px;
+  background: #A100FF;
+  cursor: pointer;
+  margin-top: -10px;
+  box-shadow: 0 0 15px 2px rgba(161, 0, 255, 0.8);
+  border: 2px solid white;
+  border-radius: 0;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
+  cursor: pointer;
+  background: #333;
+}
+
+.dark input[type="range"]::-webkit-slider-runnable-track {
+  background: #333;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: #000000;
+}
+
+input[type="range"]:focus::-webkit-slider-runnable-track {
+  background: #333;
+}
+
+/* Text glow effect */
+.text-glow {
+  text-shadow: 0 0 20px rgba(161, 0, 255, 0.5);
+}
+
+/* Chart glow effect */
+.chart-glow {
+  filter: drop-shadow(0 0 8px rgba(161, 0, 255, 0.4));
+}
+
+/* Sharp corners for Accenture style */
+.rounded-none {
+  border-radius: 0;
+}
+
 /* Scroll text animation */
 @keyframes scroll-text {
   0% {

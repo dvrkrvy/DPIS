@@ -22,8 +22,9 @@ const Navbar = () => {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/screening', label: 'Screening' },
     { path: '/resources', label: 'Resources' },
-    { path: '/forum', label: 'Community' },
+    { path: '/forum', label: 'Forum' },
     { path: '/booking', label: 'Booking' },
+    { path: '/progress', label: 'Progress' },
   ];
 
   // Get username from database (user enters this when logging in)
