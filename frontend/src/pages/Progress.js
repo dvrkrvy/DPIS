@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +15,6 @@ const Progress = () => {
   const navigate = useNavigate();
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState(null);
-  const [progressData, setProgressData] = useState(null);
   const [moodScore, setMoodScore] = useState(5);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
@@ -28,28 +27,21 @@ const Progress = () => {
     consultations: 0
   });
 
-  useEffect(() => {
-    fetchProgress();
-    fetchMoodTrends();
-    fetchScreeningHistory();
-    fetchActivitySummary();
-  }, [timeRange]);
 
-  const fetchProgress = async () => {
+  const fetchProgress = React.useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/api/progress', {
+      await api.get('/api/progress', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProgressData(response.data);
     } catch (error) {
       console.error('Failed to fetch progress data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const fetchMoodTrends = async () => {
+  const fetchMoodTrends = React.useCallback(async () => {
     try {
       const response = await api.get(`/api/progress/mood-trends?days=${timeRange}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -65,9 +57,9 @@ const Progress = () => {
         { mood_score: 4, created_at: new Date(Date.now() - 172800000).toISOString() },
       ]);
     }
-  };
+  }, [timeRange, token]);
 
-  const fetchScreeningHistory = async () => {
+  const fetchScreeningHistory = React.useCallback(async () => {
     try {
       const response = await api.get('/api/screening/history', {
         headers: { Authorization: `Bearer ${token}` }
@@ -77,9 +69,9 @@ const Progress = () => {
       console.error('Failed to fetch screening history:', error);
       setScreeningHistory([]);
     }
-  };
+  }, [token]);
 
-  const fetchActivitySummary = async () => {
+  const fetchActivitySummary = React.useCallback(async () => {
     try {
       // Fetch forum posts count
       const forumResponse = await api.get('/api/forum/posts?limit=100', {
@@ -104,7 +96,7 @@ const Progress = () => {
     } catch (error) {
       console.error('Failed to fetch activity summary:', error);
     }
-  };
+  }, [token]);
 
   const handleMoodSubmit = async (e) => {
     e.preventDefault();
@@ -426,14 +418,15 @@ const Progress = () => {
                 </div>
               ))}
             </div>
-            <a 
-              href="#" 
+            <button 
+              type="button"
+              onClick={() => toast.info('Full history feature coming soon!')}
               className={`mt-4 text-xs font-bold text-primary uppercase tracking-widest transition-colors flex items-center gap-1 ${
                 darkMode ? 'hover:text-white' : 'hover:text-black'
               }`}
             >
               View Full History <span className="material-symbols-outlined text-sm">arrow_forward</span>
-            </a>
+            </button>
           </div>
         </div>
 
