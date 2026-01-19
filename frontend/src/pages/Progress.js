@@ -302,7 +302,7 @@ const Progress = () => {
         {/* Record Mood and Activity Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
           {/* Record Mood */}
-            <div className={`lg:col-span-7 ${darkMode ? 'bg-gray-900 border-[#333333] hover:border-gray-500' : 'bg-white border-[#E0E0E0] hover:border-gray-400'} border p-8 relative group transition-colors duration-300`}>
+            <div className={`lg:col-span-7 ${darkMode ? 'bg-gray-900 border-[#333333] hover:border-gray-500' : 'bg-white border-[#E0E0E0] hover:border-gray-400'} border rounded-2xl p-8 relative group transition-colors duration-300`}>
             <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'} flex items-center gap-3`}>
               <span className="material-symbols-outlined text-primary">mood</span>
               Record Mood
@@ -359,7 +359,7 @@ const Progress = () => {
 
           {/* Activity Summary */}
           <div className="lg:col-span-5 flex flex-col gap-8">
-            <div className={`${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8 h-full`}>
+            <div className={`${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border rounded-2xl p-8 h-full`}>
               <h2 className={`text-xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'} flex items-center gap-2`}>
                 <span className={`material-symbols-outlined ${darkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>analytics</span>
                 Activity Summary
@@ -391,7 +391,7 @@ const Progress = () => {
         {/* Mood Trends and Recent History */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Mood Trends Chart */}
-          <div className={`lg:col-span-2 ${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8`}>
+          <div className={`lg:col-span-2 ${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border rounded-2xl p-8`}>
             <div className="flex items-center justify-between mb-6">
               <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Mood Trends</h2>
               <select 
@@ -409,7 +409,7 @@ const Progress = () => {
           </div>
 
           {/* Recent Mood History */}
-          <div className={`lg:col-span-1 ${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8 flex flex-col`}>
+          <div className={`lg:col-span-1 ${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border rounded-2xl p-8 flex flex-col`}>
             <h2 className={`text-xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'}`}>Recent Mood History</h2>
             <div className="space-y-0 flex-grow">
               {moodHistory.slice(0, 3).map((entry, index) => (
@@ -447,7 +447,7 @@ const Progress = () => {
         </div>
 
         {/* Screening History */}
-        <div className={`${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border p-8`}>
+        <div className={`${darkMode ? 'bg-gray-900 border-[#333333]' : 'bg-white border-[#E0E0E0]'} border rounded-2xl p-8`}>
           <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-black'} flex items-center gap-3`}>
             <span className={`material-symbols-outlined ${darkMode ? 'text-accent-teal' : 'text-black'}`}>assignment_turned_in</span>
             Screening History
