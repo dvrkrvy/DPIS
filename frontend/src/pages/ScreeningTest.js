@@ -210,8 +210,8 @@ const ScreeningTest = () => {
                 card.accent === 'purple'
                   ? 'bg-purple-600 hover:bg-purple-700'
                   : card.accent === 'cyan'
-                    ? 'bg-transparent border border-cyan-400 text-cyan-300 hover:bg-cyan-400 hover:text-black'
-                    : 'bg-transparent border border-green-400 text-green-300 hover:bg-green-400 hover:text-black';
+                    ? 'bg-cyan-500 hover:bg-cyan-600'
+                    : 'bg-green-500 hover:bg-green-600';
 
               return (
                 <div
