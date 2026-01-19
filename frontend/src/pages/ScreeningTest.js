@@ -150,8 +150,7 @@ const ScreeningTest = () => {
       badge: 'Recommended',
       accent: 'purple',
       image:
-        "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=1600&auto=format&fit=crop",
-      icon: 'bar_chart'
+        "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=1600&auto=format&fit=crop"
     },
     {
       key: 'GAD7',
@@ -161,8 +160,7 @@ const ScreeningTest = () => {
       badge: null,
       accent: 'cyan',
       image:
-        "https://images.unsplash.com/photo-1527137342181-19aab11a8ee8?q=80&w=1600&auto=format&fit=crop",
-      icon: 'psychology_alt'
+        "https://images.unsplash.com/photo-1527137342181-19aab11a8ee8?q=80&w=1600&auto=format&fit=crop"
     },
     {
       key: 'GHQ',
@@ -172,8 +170,7 @@ const ScreeningTest = () => {
       badge: null,
       accent: 'green',
       image:
-        "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1600&auto=format&fit=crop",
-      icon: 'favorite'
+        "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1600&auto=format&fit=crop"
     }
   ]), []);
 
@@ -247,14 +244,8 @@ const ScreeningTest = () => {
                   </div>
 
                   <div className="p-8 flex-1 flex flex-col relative">
-                    <div className="absolute top-6 right-6 opacity-10 group-hover:opacity-30 transition-opacity pointer-events-none">
-                      <span className="material-symbols-outlined text-6xl">
-                        {card.icon}
-                      </span>
-                    </div>
-
                     <div className="mb-auto">
-                      <h2 className="text-xl font-bold mb-3 pr-10">
+                      <h2 className="text-xl font-bold mb-3">
                         {card.title}
                       </h2>
                       <p className={`text-sm leading-relaxed mb-6 ${textSecondary}`}>
@@ -262,15 +253,21 @@ const ScreeningTest = () => {
                       </p>
                       <div className={`grid grid-cols-2 gap-y-3 gap-x-2 text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'} mb-6`}>
                         <div className="flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">schedule</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
                           {card.time}
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">verified_user</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                          </svg>
                           Validated
                         </div>
                         <div className="col-span-2 flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">lock</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
                           Confidential
                         </div>
                       </div>
@@ -279,10 +276,12 @@ const ScreeningTest = () => {
                     <div className={`pt-6 mt-4 border-t ${darkMode ? 'border-white/5' : 'border-gray-200'} flex flex-col gap-4`}>
                       <button
                         onClick={() => setTestType(card.key)}
-                        className={`w-full px-4 py-3 rounded-lg font-semibold transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 ${btnBase}`}
+                        className={`w-full px-4 py-3 rounded-lg font-semibold transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 text-white ${btnBase}`}
                       >
                         Start Assessment
-                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
                       </button>
                     </div>
                   </div>
@@ -294,12 +293,14 @@ const ScreeningTest = () => {
           <div className={`reveal-up delay-300 ${darkMode ? 'bg-gray-900/60 border-white/10' : 'bg-white border-gray-200'} border rounded-2xl p-6 backdrop-blur-sm`}>
             <div className="flex items-start gap-4">
               <div className={`p-3 rounded-full shrink-0 ${darkMode ? 'bg-purple-500/10 text-purple-300' : 'bg-purple-50 text-purple-700'}`}>
-                <span className="material-symbols-outlined">info</span>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
               <div>
                 <h4 className="font-semibold mb-2">About These Assessments</h4>
                 <p className={`text-sm leading-relaxed ${textSecondary}`}>
-                  These tools are screening instruments, not diagnostic tools. A high score indicates a higher likelihood of a condition but does not confirm it. If you’re in immediate danger, contact emergency services right away.
+                  These tools are screening instruments, not diagnostic tools. A high score indicates a higher likelihood of a condition but does not confirm it. If you're in immediate danger, contact emergency services right away.
                 </p>
               </div>
             </div>
