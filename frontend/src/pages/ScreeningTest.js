@@ -206,12 +206,24 @@ const ScreeningTest = () => {
                     ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/20'
                     : 'bg-green-500/20 text-green-300 border-green-500/20';
 
-              const btnBase =
-                card.accent === 'purple'
-                  ? 'bg-purple-600 hover:bg-purple-700'
-                  : card.accent === 'cyan'
-                    ? 'bg-cyan-500 hover:bg-cyan-600'
-                    : 'bg-green-500 hover:bg-green-600';
+              // Determine button background color and shadow
+              const getButtonStyles = () => {
+                if (card.accent === 'purple') {
+                  return {
+                    className: 'bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-500/25',
+                  };
+                } else if (card.accent === 'cyan') {
+                  return {
+                    className: 'bg-cyan-500 hover:bg-cyan-600 shadow-lg shadow-cyan-500/25',
+                  };
+                } else {
+                  return {
+                    className: 'bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/25',
+                  };
+                }
+              };
+
+              const buttonStyles = getButtonStyles();
 
               return (
                 <div
@@ -276,7 +288,10 @@ const ScreeningTest = () => {
                     <div className={`pt-6 mt-4 border-t ${darkMode ? 'border-white/5' : 'border-gray-200'} flex flex-col gap-4`}>
                       <button
                         onClick={() => setTestType(card.key)}
-                        className={`w-full px-4 py-3 rounded-lg font-semibold transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 text-white ${btnBase}`}
+                        className={`w-full px-4 py-3 rounded-lg font-semibold transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 text-white ${buttonStyles.className}`}
+                        style={{
+                          backgroundColor: card.accent === 'purple' ? '#9333ea' : card.accent === 'cyan' ? '#06b6d4' : '#10b981',
+                        }}
                       >
                         Start Assessment
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ strokeWidth: '2' }}>
