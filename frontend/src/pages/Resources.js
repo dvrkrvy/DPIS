@@ -11,12 +11,10 @@ const Resources = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [resources, setResources] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [contentTypes, setContentTypes] = useState([]);
   const [filters, setFilters] = useState({ category: '', contentType: '', search: '' });
-  const [activeTab, setActiveTab] = useState('all');
+  const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
-  const [personalized, setPersonalized] = useState(true);
+  const [personalized] = useState(true);
   const [testResultsCount, setTestResultsCount] = useState(null);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [emergencyContacts, setEmergencyContacts] = useState(null);
@@ -52,15 +50,21 @@ const Resources = () => {
     } finally {
       setLoading(false);
     }
-  }, [personalized, user?.role, filters, token]);
+  }, [personalized, filters, token]);
 
   useEffect(() => {
     if (token) {
-      fetchCategories();
-      fetchContentTypes();
       fetchResources();
     }
-  }, [location.pathname, token]);
+  }, [location.pathname, token, fetchResources]);
+
+  // Debounce network requests while typing; also lets us do instant client-side filtering.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, search: searchInput }));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
   
   useEffect(() => {
     const handleStorageChange = (e) => {
@@ -92,28 +96,6 @@ const Resources = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [token, location.pathname, fetchResources]);
-
-  const fetchCategories = async () => {
-    try {
-      const response = await api.get('/api/resources/meta/categories', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setCategories(response.data.categories || []);
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-    }
-  };
-
-  const fetchContentTypes = async () => {
-    try {
-      const response = await api.get('/api/resources/meta/content-types', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setContentTypes(response.data.contentTypes || []);
-    } catch (error) {
-      console.error('Failed to fetch content types:', error);
-    }
-  };
 
   const handleEmergencyClick = async () => {
     try {
@@ -171,64 +153,30 @@ const Resources = () => {
     return 'View Resource';
   };
 
-  const isYouTubeUrl = (url) => {
-    if (!url) return false;
-    const urlLower = url.toLowerCase();
-    return urlLower.includes('youtube.com') || urlLower.includes('youtu.be');
-  };
-
-  const getYouTubeEmbedUrl = (url) => {
-    if (!url) return null;
-    let videoId = null;
-    const embedMatch = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
-    if (embedMatch) videoId = embedMatch[1];
-    if (!videoId) {
-      const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-      if (watchMatch) videoId = watchMatch[1];
-    }
-    if (!videoId) {
-      const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-      if (shortMatch) videoId = shortMatch[1];
-    }
-    if (!videoId) {
-      const vMatch = url.match(/youtube\.com\/v\/([a-zA-Z0-9_-]{11})/);
-      if (vMatch) videoId = vMatch[1];
-    }
-    if (videoId) {
-      return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&enablejsapi=1`;
-    }
-    return null;
-  };
-
   const bgMain = darkMode ? 'bg-black' : 'bg-white';
   const textMain = darkMode ? 'text-white' : 'text-black';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-600';
   const cardBg = darkMode ? 'bg-gray-900' : 'bg-white';
   const cardBorder = darkMode ? 'border-gray-800' : 'border-gray-200';
 
-  // Filter resources by active tab
-  const filteredResources = resources.filter(resource => {
-    if (activeTab === 'all') return true;
-    const type = resource.contentType?.toLowerCase() || '';
-    if (activeTab === 'audio') return type.includes('audio');
-    if (activeTab === 'video') return type.includes('video');
-    if (activeTab === 'articles') return type.includes('article');
-    if (activeTab === 'crisis') {
-      const tags = (resource.tags || []).map(t => t.toLowerCase());
-      const title = (resource.title || '').toLowerCase();
-      return tags.some(t => t.includes('crisis') || t.includes('emergency') || t.includes('panic')) ||
-             title.includes('crisis') || title.includes('emergency');
-    }
-    return true;
-  });
+  const normalize = (v) => (v ?? '').toString().toLowerCase().trim();
 
-  const tabs = [
-    { id: 'all', label: 'All Resources' },
-    { id: 'audio', label: 'Audio Guides' },
-    { id: 'video', label: 'Video Sessions' },
-    { id: 'articles', label: 'Articles & Research' },
-    { id: 'crisis', label: 'Crisis Tools' },
-  ];
+  const filteredResources = resources.filter((resource) => {
+    const q = normalize(searchInput);
+    if (!q) return true;
+
+    const haystack = [
+      resource.title,
+      resource.description,
+      resource.category,
+      resource.contentType,
+      ...(Array.isArray(resource.tags) ? resource.tags : []),
+    ]
+      .map(normalize)
+      .join(' ');
+
+    return haystack.includes(q);
+  });
 
   return (
     <div className={`min-h-screen ${bgMain} ${textMain} transition-colors`}>
@@ -266,8 +214,8 @@ const Resources = () => {
                   </svg>
                   <input
                     type="text"
-                    value={filters.search}
-                    onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     placeholder="Search resources, topics, tags..."
                     className={`bg-transparent border-none ${textMain} placeholder-gray-500 focus:ring-0 w-full text-sm font-medium p-0`}
                   />
@@ -281,28 +229,7 @@ const Resources = () => {
             </div>
           </div>
           
-          {/* Tab Navigation */}
-          <div className={`border-b pb-1 flex gap-8 overflow-x-auto no-scrollbar ${
-            darkMode ? 'border-white/10' : 'border-gray-200'
-          }`}>
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`pb-3 border-b-2 whitespace-nowrap text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? darkMode
-                      ? 'border-purple-500 text-white'
-                      : 'border-black text-black font-bold'
-                    : darkMode
-                      ? 'border-transparent text-gray-400 hover:text-white hover:border-white/20'
-                      : 'border-transparent text-gray-500 hover:text-black hover:border-gray-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {/* (Removed) Content-type sections/tabs (Audio/Video/Articles/etc) */}
         </div>
 
         {/* Resource Cards Grid */}
@@ -320,11 +247,6 @@ const Resources = () => {
             {filteredResources.map((resource, idx) => {
               const contentTypeColor = getContentTypeColor(resource.contentType, darkMode);
               const contentTypeIcon = getContentTypeIcon(resource.contentType);
-              const hoverColor = resource.contentType?.toLowerCase().includes('audio') 
-                ? darkMode ? 'hover:border-cyan-500/50' : 'hover:border-cyan-500/50'
-                : resource.contentType?.toLowerCase().includes('video')
-                ? darkMode ? 'hover:border-purple-500/50' : 'hover:border-purple-500/50'
-                : darkMode ? 'hover:border-pink-500/50' : 'hover:border-pink-500/50';
 
               return (
                 <div

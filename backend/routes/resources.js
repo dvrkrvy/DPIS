@@ -58,6 +58,33 @@ router.get('/', authenticate, async (req, res) => {
     const params = [];
     let paramCount = 0;
 
+    const appendStandardFilters = () => {
+      if (category) {
+        paramCount++;
+        query += ` AND category = $${paramCount}`;
+        params.push(category);
+      }
+
+      if (contentType) {
+        paramCount++;
+        query += ` AND content_type = $${paramCount}`;
+        params.push(contentType);
+      }
+
+      if (search) {
+        paramCount++;
+        // Use one parameter for all search predicates
+        // - title/description: ILIKE '%search%'
+        // - tags (text[]): case-insensitive partial match on any tag
+        query += ` AND (
+          title ILIKE $${paramCount}
+          OR description ILIKE $${paramCount}
+          OR EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE $${paramCount})
+        )`;
+        params.push(`%${search}%`);
+      }
+    };
+
     // If personalized is true and columns exist, filter based on user's last 3 test results
     if (isPersonalized && req.user.role === 'student' && hasPersonalizationColumns) {
       query = 'SELECT * FROM resources WHERE is_active = true';
@@ -155,8 +182,10 @@ router.get('/', authenticate, async (req, res) => {
         // Order by priority (higher = more relevant), then by date
         // Limit to top 20 most relevant resources
         if (hasPersonalizationColumns) {
+          appendStandardFilters();
           query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 20';
         } else {
+          appendStandardFilters();
           query += ' ORDER BY created_at DESC LIMIT 20';
         }
       } else {
@@ -165,32 +194,18 @@ router.get('/', authenticate, async (req, res) => {
         query = 'SELECT * FROM resources WHERE is_active = true';
         if (hasPersonalizationColumns) {
           query += ' AND (test_types IS NULL OR array_length(test_types, 1) IS NULL)';
+          appendStandardFilters();
           query += ' ORDER BY COALESCE(priority, 0) DESC, created_at DESC LIMIT 20';
         } else {
           // If columns don't exist, just return top 20 active resources
+          appendStandardFilters();
           query += ' ORDER BY created_at DESC LIMIT 20';
         }
       }
     } else {
       // Regular filtering without personalization (or if columns don't exist)
       query = 'SELECT * FROM resources WHERE is_active = true';
-      if (category) {
-        paramCount++;
-        query += ` AND category = $${paramCount}`;
-        params.push(category);
-      }
-
-      if (contentType) {
-        paramCount++;
-        query += ` AND content_type = $${paramCount}`;
-        params.push(contentType);
-      }
-
-      if (search) {
-        paramCount++;
-        query += ` AND (title ILIKE $${paramCount} OR description ILIKE $${paramCount} OR $${paramCount} = ANY(tags))`;
-        params.push(`%${search}%`);
-      }
+      appendStandardFilters();
 
       // Only use priority if column exists, limit to 20
       if (hasPersonalizationColumns) {
