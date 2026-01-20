@@ -9,8 +9,9 @@ router.post('/mood', authenticate, requireStudent, async (req, res) => {
     const { moodScore, notes } = req.body;
     const userId = req.user.id;
 
-    if (!moodScore || moodScore < 1 || moodScore > 10) {
-      return res.status(400).json({ message: 'Mood score must be between 1 and 10' });
+    // Frontend slider is 0-10; accept 0-10 inclusive.
+    if (moodScore === undefined || moodScore === null || moodScore < 0 || moodScore > 10) {
+      return res.status(400).json({ message: 'Mood score must be between 0 and 10' });
     }
 
     const result = await pool.query(
@@ -83,7 +84,10 @@ router.get('/mood-trends', authenticate, requireStudent, async (req, res) => {
     const { days = 30 } = req.query;
 
     const result = await pool.query(
-      `SELECT DATE(created_at) as date, AVG(mood_score) as avg_mood, COUNT(*) as count
+      `SELECT 
+         DATE(created_at) as date,
+         ROUND(AVG(mood_score)::numeric, 2) as avg_mood,
+         COUNT(*) as count
        FROM progress_tracking
        WHERE user_id = $1 
          AND activity_type = 'mood_tracking'

@@ -47,14 +47,15 @@ const Progress = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       const trends = response.data.trends || [];
-      setMoodHistory(trends.slice(0, 10).reverse());
+      // API returns daily aggregates ordered ASC by date.
+      setMoodHistory(trends);
     } catch (error) {
       console.error('Failed to fetch mood trends:', error);
       // Set default data
       setMoodHistory([
-        { mood_score: 5, created_at: new Date().toISOString() },
-        { mood_score: 7, created_at: new Date(Date.now() - 86400000).toISOString() },
-        { mood_score: 4, created_at: new Date(Date.now() - 172800000).toISOString() },
+        { date: new Date().toISOString(), avg_mood: 5, count: 1 },
+        { date: new Date(Date.now() - 86400000).toISOString(), avg_mood: 7, count: 1 },
+        { date: new Date(Date.now() - 172800000).toISOString(), avg_mood: 4, count: 1 },
       ]);
     }
   }, [timeRange, token]);
@@ -180,15 +181,24 @@ const Progress = () => {
     }
   };
 
+  const formatShortDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
   // Prepare chart data
+  const chartPoints = moodHistory.slice(-Math.min(parseInt(timeRange, 10) || 7, 30));
   const chartData = {
-    labels: moodHistory.slice(0, 7).map((_, i) => {
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return days[i] || `Day ${i + 1}`;
-    }),
+    labels: chartPoints.map((entry) => formatShortDate(entry.date)),
     datasets: [{
       label: 'Mood Score',
-      data: moodHistory.slice(0, 7).map(entry => entry.mood_score || 5),
+      data: chartPoints.map(entry => Number(entry.avg_mood ?? 5)),
       borderColor: '#A100FF',
       backgroundColor: darkMode 
         ? 'rgba(161, 0, 255, 0.5)' 
@@ -223,7 +233,7 @@ const Progress = () => {
         displayColors: false,
         callbacks: {
           label: function(context) {
-            return 'Score: ' + context.parsed.y + '/10';
+            return 'Avg: ' + context.parsed.y + '/10';
           }
         }
       }
@@ -419,16 +429,19 @@ const Progress = () => {
                 >
                   <div className="flex justify-between items-end mb-2">
                     <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
-                      {entry.mood_score || 5}<span className={`text-sm font-normal ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>/10</span>
+                      {Number(entry.avg_mood ?? 5)}<span className={`text-sm font-normal ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>/10</span>
                     </span>
                     <span className={`text-xs font-mono ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {formatDate(entry.created_at)}
+                      {formatDate(entry.date)}
                     </span>
+                  </div>
+                  <div className={`text-[10px] font-mono uppercase mb-2 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                    {entry.count ? `${entry.count} entr${entry.count === 1 ? 'y' : 'ies'} (daily avg)` : 'Daily avg'}
                   </div>
                   <div className={`w-full h-1 ${darkMode ? 'bg-[#222]' : 'bg-gray-200'}`}>
                     <div 
                       className={`bg-primary h-1 ${darkMode ? 'shadow-[0_0_8px_rgba(161,0,255,0.8)]' : ''}`}
-                      style={{ width: `${((entry.mood_score || 5) / 10) * 100}%` }}
+                      style={{ width: `${((Number(entry.avg_mood ?? 5)) / 10) * 100}%` }}
                     ></div>
                   </div>
                 </div>
