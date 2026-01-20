@@ -68,6 +68,14 @@ function AppContent() {
           }
         />
         <Route
+          path="/forum/:id"
+          element={
+            <PrivateRoute>
+              <Forum />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/booking"
           element={
             <PrivateRoute>

@@ -298,8 +298,6 @@ const Dashboard = () => {
             <p className={`text-lg mb-8 max-w-xl font-light ${
               darkMode ? 'text-gray-300' : 'text-gray-700'
             }`}>
-              Your cognitive resilience score has increased by{' '}
-              <span className="text-green-500 font-semibold">+{resilienceChange}%</span> this week. 
               Continue your journey with today's recommended session.
             </p>
 
