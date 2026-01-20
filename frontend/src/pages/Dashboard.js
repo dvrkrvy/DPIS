@@ -132,7 +132,8 @@ const Dashboard = () => {
   };
 
   const userName = getUserDisplayName();
-  const resilienceChange = dashboardData.cognitiveResilience?.change || 12;
+  // Removed the “increased by X% this week” copy; keep change value only if needed later.
+  // const resilienceChange = dashboardData.cognitiveResilience?.change || 12;
   const pendingCount = dashboardData.pendingAssessments?.count || 2;
   const completionPercentage = dashboardData.pendingAssessments?.completionPercentage || 75;
   const newResourcesCount = dashboardData.library?.newResourcesCount || 0;
