@@ -217,7 +217,7 @@ router.post('/posts/:id/reactions', authenticate, requireStudent, async (req, re
     const { type } = req.body;
     const anonymousId = req.user.anonymousId;
 
-    if (!['like', 'support', 'helpful'].includes(type)) {
+    if (!['like', 'dislike', 'support', 'helpful'].includes(type)) {
       return res.status(400).json({ message: 'Invalid reaction type' });
     }
 

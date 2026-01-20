@@ -28,6 +28,9 @@ const Forum = () => {
     category: 'general'
   });
   const [newReply, setNewReply] = useState('');
+  const [expandedPostId, setExpandedPostId] = useState(null);
+  const [expandedPost, setExpandedPost] = useState(null);
+  const [replyDraftByPostId, setReplyDraftByPostId] = useState({});
   const [loading, setLoading] = useState(true);
 
   /* ---------------- SOCKET ---------------- */
@@ -39,7 +42,10 @@ const Forum = () => {
     });
 
     socket.on('new-post', fetchPosts);
-    socket.on('new-reply', () => id && fetchPost(id));
+    socket.on('new-reply', () => {
+      if (id) fetchPost(id);
+      if (expandedPostId) fetchExpandedPost(expandedPostId);
+    });
 
     return () => socket.disconnect();
   }, [id, token]);
@@ -96,6 +102,16 @@ const Forum = () => {
     }
   };
 
+  const fetchExpandedPost = async (postId) => {
+    try {
+      const res = await api.get(`/api/forum/posts/${postId}`, authHeader);
+      setExpandedPost(res.data.post);
+    } catch (error) {
+      console.error('Failed to fetch expanded post:', error);
+      toast.error('Failed to load thread');
+    }
+  };
+
   /* ---------------- ACTIONS ---------------- */
   const handleCreatePost = async (e) => {
     e.preventDefault();
@@ -121,6 +137,43 @@ const Forum = () => {
     } catch (error) {
       console.error('Failed to add reply:', error);
       toast.error('Failed to add reply');
+    }
+  };
+
+  const handleAddReplyInline = async (postId) => {
+    const content = (replyDraftByPostId[postId] || '').trim();
+    if (!content) return;
+    try {
+      await api.post(`/api/forum/posts/${postId}/replies`, { content }, authHeader);
+      toast.success('Reply added');
+      setReplyDraftByPostId(prev => ({ ...prev, [postId]: '' }));
+      fetchPosts();
+      fetchExpandedPost(postId);
+    } catch (error) {
+      console.error('Failed to add reply:', error);
+      toast.error('Failed to add reply');
+    }
+  };
+
+  const getReactionCounts = (p) => {
+    const reactions = Array.isArray(p?.reactions) ? p.reactions : [];
+    return {
+      likes: reactions.filter(r => r.type === 'like').length,
+      dislikes: reactions.filter(r => r.type === 'dislike').length
+    };
+  };
+
+  const handleReact = async (postId, type) => {
+    try {
+      await api.post(`/api/forum/posts/${postId}/reactions`, { type }, authHeader);
+      // Refresh list + expanded view
+      fetchPosts();
+      if (expandedPostId === postId) {
+        fetchExpandedPost(postId);
+      }
+    } catch (error) {
+      console.error('Failed to react:', error);
+      toast.error('Failed to react');
     }
   };
 
@@ -458,26 +511,35 @@ const Forum = () => {
             ) : filteredPosts.length > 0 ? (
               filteredPosts.map((p, idx) => {
                 const isAnnouncement = p.isPinned || p.category === 'announcement';
+                const isExpanded = expandedPostId === p._id;
+                const counts = getReactionCounts(p);
                 return (
-                  <div
-                    key={p._id}
-                    onClick={() => navigate(`/forum/${p._id}`)}
-                    className={`reveal-up delay-${idx < 3 ? (idx + 1) * 100 : 300} group ${surfaceCard} border ${
-                      isAnnouncement
-                        ? darkMode
-                          ? 'border-primary/30 bg-mesh-card'
-                          : 'border-primary/40 bg-mesh-card'
-                        : borderDark
-                    } rounded-2xl p-6 transition-all duration-300 ${
-                      darkMode
-                        ? isAnnouncement
-                          ? 'hover:border-primary/60 card-glow'
-                          : 'hover:border-white/20 hover:bg-white/[0.02]'
-                        : isAnnouncement
-                          ? 'hover:shadow-lg hover:shadow-primary/5'
-                          : 'hover:border-gray-400 hover:shadow-md'
-                    } cursor-pointer`}
-                  >
+                  <React.Fragment key={p._id}>
+                    <div
+                      onClick={() => {
+                        const next = isExpanded ? null : p._id;
+                        setExpandedPostId(next);
+                        setExpandedPost(null);
+                        if (next) {
+                          fetchExpandedPost(next);
+                        }
+                      }}
+                      className={`reveal-up delay-${idx < 3 ? (idx + 1) * 100 : 300} group ${surfaceCard} border ${
+                        isAnnouncement
+                          ? darkMode
+                            ? 'border-primary/30 bg-mesh-card'
+                            : 'border-primary/40 bg-mesh-card'
+                          : borderDark
+                      } rounded-2xl p-6 transition-all duration-300 ${
+                        darkMode
+                          ? isAnnouncement
+                            ? 'hover:border-primary/60 card-glow'
+                            : 'hover:border-white/20 hover:bg-white/[0.02]'
+                          : isAnnouncement
+                            ? 'hover:shadow-lg hover:shadow-primary/5'
+                            : 'hover:border-gray-400 hover:shadow-md'
+                      } cursor-pointer`}
+                    >
                     {isAnnouncement && (
                       <div className="absolute top-4 right-4">
                         <svg className={`w-5 h-5 ${darkMode ? 'text-primary/60' : 'text-primary'} transform rotate-45`} fill="currentColor" viewBox="0 0 24 24">
@@ -540,25 +602,119 @@ const Forum = () => {
                             </svg>
                             <span>{p.replies?.length || 0} {p.replies?.length === 1 ? 'Reply' : 'Replies'}</span>
                           </div>
-                          <div className={`flex items-center gap-1.5 ${darkMode ? 'group-hover:text-secondary' : 'group-hover:text-primary'} transition-colors`}>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            <span>{p.views || Math.floor(Math.random() * 100) + 10} Views</span>
+                          <div className="flex items-center gap-3 ml-auto">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReact(p._id, 'like');
+                              }}
+                              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors ${
+                                darkMode ? 'text-gray-400 hover:text-primary hover:bg-white/5' : 'text-gray-600 hover:text-primary hover:bg-gray-100'
+                              }`}
+                              title="Like"
+                            >
+                              <span className="material-symbols-outlined text-base">thumb_up</span>
+                              <span className="font-bold">{counts.likes}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReact(p._id, 'dislike');
+                              }}
+                              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors ${
+                                darkMode ? 'text-gray-400 hover:text-secondary hover:bg-white/5' : 'text-gray-600 hover:text-secondary hover:bg-gray-100'
+                              }`}
+                              title="Dislike"
+                            >
+                              <span className="material-symbols-outlined text-base">thumb_down</span>
+                              <span className="font-bold">{counts.dislikes}</span>
+                            </button>
                           </div>
-                          {p.reactions && p.reactions.length > 0 && (
-                            <div className={`flex items-center gap-1.5 ${darkMode ? 'group-hover:text-secondary' : 'group-hover:text-primary'} transition-colors ml-auto`}>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                              </svg>
-                              <span>{p.reactions.length}</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
+                    </div>
+                    {isExpanded && (
+                    <div
+                      className={`${surfaceCard} border ${borderDark} rounded-2xl p-6 -mt-2 mb-4 ${
+                        darkMode ? 'bg-white/[0.02]' : 'bg-gray-50'
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {!expandedPost ? (
+                        <div className="py-6 text-center">
+                          <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${darkMode ? 'border-primary' : 'border-primary'} mx-auto mb-3`}></div>
+                          <p className={textSecondary}>Loading thread...</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between">
+                            <h4 className={`text-lg font-display font-bold ${textMain}`}>
+                              Replies ({expandedPost.replies?.length || 0})
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/forum/${p._id}`)}
+                              className={`text-xs font-bold uppercase tracking-widest ${
+                                darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-black'
+                              } transition-colors`}
+                            >
+                              Open Full View →
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            {expandedPost.replies && expandedPost.replies.length > 0 ? (
+                              expandedPost.replies.map((r, i) => (
+                                <div
+                                  key={i}
+                                  className={`${darkMode ? 'bg-surface-card border-white/10' : 'bg-white border-gray-200'} border rounded-xl p-4`}
+                                >
+                                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} text-sm leading-relaxed whitespace-pre-wrap`}>
+                                    {r.content}
+                                  </p>
+                                  {r.createdAt && (
+                                    <p className={`text-[10px] mt-2 font-bold uppercase tracking-widest ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+                                      {new Date(r.createdAt).toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} italic`}>
+                                No replies yet. Be the first to reply!
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="text"
+                              value={replyDraftByPostId[p._id] || ''}
+                              onChange={(e) => setReplyDraftByPostId(prev => ({ ...prev, [p._id]: e.target.value }))}
+                              className={`flex-grow ${
+                                darkMode
+                                  ? 'bg-white/5 border-white/10 text-white placeholder-gray-500'
+                                  : 'bg-white border-gray-200 text-black placeholder-gray-500'
+                              } border rounded-full py-3 px-6 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-white/10 transition-all text-sm`}
+                              placeholder="Write a reply..."
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddReplyInline(p._id)}
+                              className={`${darkMode ? 'bg-primary hover:bg-primary/90 shadow-[0_0_15px_rgba(124,77,255,0.35)]' : 'bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20'} text-white font-bold px-6 py-3 rounded-full flex items-center gap-2 transition-all btn-glow whitespace-nowrap`}
+                            >
+                              <span>Post Reply</span>
+                              <span className="material-symbols-outlined text-lg">send</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    )}
+                  </React.Fragment>
                 );
               })
             ) : (

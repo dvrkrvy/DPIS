@@ -28,7 +28,7 @@ const forumPostSchema = new mongoose.Schema({
   }],
   reactions: [{
     anonymousId: String,
-    type: { type: String, enum: ['like', 'support', 'helpful'] }
+    type: { type: String, enum: ['like', 'dislike', 'support', 'helpful'] }
   }],
   isActive: {
     type: Boolean,
