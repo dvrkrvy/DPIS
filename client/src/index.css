@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-background: #fcf9f2;
+    --color-surface: #fcf9f2;
+    --color-surface-bright: #fcf9f2;
+    --color-surface-dim: #dcdad3;
+    --color-surface-container-lowest: #ffffff;
+    --color-surface-container-low: #f6f3ec;
+    --color-surface-container: #f1eee7;
+    --color-surface-container-high: #ebe8e1;
+    --color-surface-container-highest: #e5e2db;
+    --color-on-surface: #1c1c18;
+    --color-on-surface-variant: #444841;
+    --color-on-background: #1c1c18;
+    --color-primary: #33452f;
+    --color-primary-container: #4a5d45;
+    --color-on-primary: #ffffff;
+    --color-on-primary-container: #bfd5b7;
+    --color-primary-fixed: #d3e9ca;
+    --color-primary-fixed-dim: #b7cdaf;
+    --color-on-primary-fixed: #0f1f0c;
+    --color-on-primary-fixed-variant: #394c35;
+    --color-secondary: #53634b;
+    --color-secondary-container: #d3e5c7;
+    --color-on-secondary: #ffffff;
+    --color-on-secondary-container: #57674f;
+    --color-secondary-fixed: #d6e8ca;
+    --color-secondary-fixed-dim: #baccaf;
+    --color-tertiary: #3d423b;
+    --color-tertiary-container: #545a51;
+    --color-on-tertiary: #ffffff;
+    --color-on-tertiary-container: #ccd1c6;
+    --color-tertiary-fixed: #dfe4d9;
+    --color-tertiary-fixed-dim: #c3c8bd;
+    --color-inverse-surface: #31312c;
+    --color-inverse-on-surface: #f3f0e9;
+    --color-inverse-primary: #b7cdaf;
+    --color-outline: #747870;
+    --color-outline-variant: #c4c8be;
+    --color-error: #ba1a1a;
+    --color-error-container: #ffdad6;
+    --color-on-error: #ffffff;
+    --color-on-error-container: #93000a;
+  }
+
+  .dark {
+    /* Dark mode primary surfaces: true black / charcoal greyish black */
+    --color-background: #090a0d;
+    --color-surface: #090a0d;
+    --color-surface-bright: #121318;
+    --color-surface-dim: #090a0d;
+    --color-surface-container-lowest: #121318;
+    --color-surface-container-low: #171821;
+    --color-surface-container: #1d1e28;
+    --color-surface-container-high: #242532;
+    --color-surface-container-highest: #2b2d3c;
+    --color-on-surface: #f4f4f7;
+    --color-on-surface-variant: #9ca3af;
+    --color-on-background: #f4f4f7;
+    --color-on-primary-fixed: #090a0d;
+    --color-tertiary: #121318;
+    --color-inverse-surface: #0c0d12;
+    --color-inverse-on-surface: #f4f4f7;
+    --color-tertiary-fixed-dim: #9ca3af;
+    --color-outline: #2e303d;
+    --color-outline-variant: #1f202a;
+
+    /* Olive and Beige accents ONLY in accents */
+    --color-primary: #8fa986;
+    --color-primary-container: #202b1d;
+    --color-on-primary: #0a0b0e;
+    --color-on-primary-container: #d6ebd1;
+    --color-primary-fixed: #1e291c;
+    --color-primary-fixed-dim: #8fa986;
+    --color-on-primary-fixed-variant: #c3d9bd;
+    --color-secondary: #7d9675;
+    --color-secondary-container: #1c251a;
+    --color-on-secondary: #0a0b0e;
+    --color-on-secondary-container: #c4dcbd;
+    --color-secondary-fixed: #253322;
+    --color-secondary-fixed-dim: #8fa986;
+    --color-tertiary-container: #262722;
+    --color-on-tertiary: #0a0b0e;
+    --color-on-tertiary-container: #e6e2d8;
+    --color-tertiary-fixed: #e2ded5;
+    --color-inverse-primary: #33452f;
+    --color-error: #f87171;
+    --color-error-container: #2f1517;
+    --color-on-error: #ffffff;
+    --color-on-error-container: #fca5a5;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    scroll-behavior: smooth;
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+
+  main > :first-child {
+    margin-top: 0 !important;
+  }
+
+  main > :last-child {
+    margin-bottom: 0 !important;
+  }
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
