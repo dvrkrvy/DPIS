@@ -79,12 +79,14 @@ export const adminApi = {
     const qs = params.toString();
     return request(`/api/admin/profiles${qs ? `?${qs}` : ''}`);
   },
+  getPatientHistory: (anonymousId) => request(`/api/admin/patient/${anonymousId}/history`),
   getAnalytics: ({ month } = {}) => {
     const params = new URLSearchParams();
     if (month) params.set('month', month);
     const qs = params.toString();
     return request(`/api/admin/analytics${qs ? `?${qs}` : ''}`);
   },
+  getTreatmentRecords: () => request('/api/admin/treatment-records'),
   getAiAnalyticsSummary: (payload = {}) =>
     request('/api/admin/analytics/ai-summary', {
       method: 'POST',
@@ -95,8 +97,46 @@ export const adminApi = {
 export const doctorApi = {
   getAssignedOrgs: () => request('/api/doctor/orgs'),
   getOrgQueue: (orgId) => request(`/api/doctor/queue/${orgId}`),
+  getPatientHistory: (anonymousId) => request(`/api/doctor/patient/${anonymousId}/history`),
   updateCaseStatus: (assessmentId, payload) =>
     request(`/api/doctor/cases/${assessmentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+};
+
+export const appointmentApi = {
+  getAvailability: ({ date, doctorId } = {}) => {
+    const params = new URLSearchParams();
+    if (date) params.set('date', date);
+    if (doctorId) params.set('doctorId', doctorId);
+    const qs = params.toString();
+    return request(`/api/appointments/availability${qs ? `?${qs}` : ''}`);
+  },
+  getMyAppointments: () => request('/api/appointments/my'),
+  bookAppointment: (payload) =>
+    request('/api/appointments/book', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  rescheduleAppointment: (id, payload) =>
+    request(`/api/appointments/${id}/reschedule`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+  getDoctorAppointments: ({ date } = {}) => {
+    const params = new URLSearchParams();
+    if (date) params.set('date', date);
+    const qs = params.toString();
+    return request(`/api/appointments/doctor${qs ? `?${qs}` : ''}`);
+  },
+  doctorBookAppointment: (payload) =>
+    request('/api/appointments/doctor-book', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateAppointmentStatus: (id, payload) =>
+    request(`/api/appointments/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),

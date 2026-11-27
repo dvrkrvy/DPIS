@@ -84,6 +84,10 @@ const register = async (req, res) => {
             orgId: validOrgId,
         });
 
+        if (userRole === 'DOCTOR') {
+            await Organization.updateMany({}, { $addToSet: { assignedDoctors: user._id } });
+        }
+
         return res.status(201).json({
             message: 'User registered successfully',
             user: {
@@ -134,6 +138,13 @@ const login = async (req, res) => {
                     await ownedOrg.save();
                 }
             }
+        }
+
+        if (user.role === 'DOCTOR') {
+            await Organization.updateMany(
+                { assignedDoctors: { $ne: user._id } },
+                { $addToSet: { assignedDoctors: user._id } }
+            );
         }
 
         const token = jwt.sign(

@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const Assessment = require('../models/Assessment');
 const Organization = require('../models/Organization');
 const UserIdentity = require('../models/UserIdentity');
+const Report = require('../models/Report');
+const Appointment = require('../models/Appointment');
 const { generateAdminAnalyticsSummary } = require('../config/ai');
 const { normalizeEmailDomain } = require('../utils/domain');
 
@@ -152,12 +154,15 @@ const createOrganization = async (req, res) => {
             });
         }
 
+        const allDoctors = await UserIdentity.find({ role: 'DOCTOR' }).select('_id');
+        const doctorIds = allDoctors.map((d) => d._id);
+
         const payload = {
             name: name.trim(),
             type,
             emailDomain: normalizedDomain,
             createdBy: adminUser._id,
-            assignedDoctors: Array.isArray(assignedDoctors) ? assignedDoctors : [],
+            assignedDoctors: doctorIds,
         };
 
         if (inviteCode && String(inviteCode).trim()) {
@@ -215,7 +220,7 @@ const getAnonymousProfiles = async (req, res) => {
 
         // Explicitly select only anonymized fields; never touch UserIdentity
         const profiles = await Assessment.find(filter)
-            .select('anonymousId month scores severityTier doctorStatus createdAt')
+            .select('anonymousId month scores severityTier doctorStatus doctorNotes createdAt')
             .sort({ createdAt: -1 });
 
         return res.json({
@@ -224,6 +229,48 @@ const getAnonymousProfiles = async (req, res) => {
         });
     } catch (err) {
         return res.status(500).json({ message: 'Failed to fetch profiles', error: err.message });
+    }
+};
+
+const getAnonymousPatientHistory = async (req, res) => {
+    try {
+        const orgId = await resolveAdminOrgId(req.user);
+        if (!orgId) {
+            return res.status(400).json({ message: 'Admin is not linked to an organization' });
+        }
+
+        const { anonymousId } = req.params;
+        const assessments = await Assessment.find({ orgId, anonymousId })
+            .select('anonymousId month scores severityTier doctorStatus doctorNotes createdAt')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        if (!assessments.length) {
+            return res.status(404).json({ message: 'No records found for this anonymous profile' });
+        }
+
+        const assessmentIds = assessments.map((a) => a._id);
+        const reports = await Report.find({ assessmentId: { $in: assessmentIds } })
+            .select('assessmentId aiSummary actionableSteps createdAt')
+            .lean();
+
+        const reportMap = {};
+        for (const r of reports) {
+            reportMap[String(r.assessmentId)] = r;
+        }
+
+        const history = assessments.map((a) => ({
+            ...a,
+            report: reportMap[String(a._id)] || null,
+        }));
+
+        return res.json({
+            anonymousId,
+            totalAssessments: assessments.length,
+            history,
+        });
+    } catch (err) {
+        return res.status(500).json({ message: 'Failed to load patient history', error: err.message });
     }
 };
 
@@ -250,6 +297,165 @@ const generateInstantAnalyticsSummary = ({ orgName, totalAssessments, severityCo
             : 'Preventative Wellness: Low clinical escalation volume observed; recommend continuing general stress-management psychoeducation.',
         'Institutional Guidance: Maintain privacy-first zero-PII protocols and schedule seasonal decompression workshops during high-stress academic or quarterly cycles.',
     ];
+};
+
+const buildCounselingAndTreatmentRecords = async (orgObjectId) => {
+    const appointments = await Appointment.find({ orgId: orgObjectId })
+        .populate('doctorId', 'fullName email')
+        .sort({ date: -1, slotStart: -1 })
+        .lean();
+
+    const totalBooked = appointments.length;
+    let completedCount = 0;
+    let scheduledCount = 0;
+    let cancelledCount = 0;
+    let doctorInitiatedCount = 0;
+    let studentInitiatedCount = 0;
+
+    const doctorMap = {};
+    const studentMap = {};
+
+    for (const appt of appointments) {
+        if (appt.status === 'COMPLETED') completedCount++;
+        else if (appt.status === 'CANCELLED') cancelledCount++;
+        else scheduledCount++;
+
+        if (appt.initiatedBy === 'DOCTOR') doctorInitiatedCount++;
+        else studentInitiatedCount++;
+
+        // Doctors aggregation
+        if (appt.doctorId) {
+            const docId = String(appt.doctorId._id || appt.doctorId);
+            if (!doctorMap[docId]) {
+                doctorMap[docId] = {
+                    doctorId: docId,
+                    fullName: appt.doctorId.fullName || 'Assigned Clinician',
+                    email: appt.doctorId.email || '',
+                    completedSessions: 0,
+                    scheduledSessions: 0,
+                    cancelledSessions: 0,
+                    totalSessions: 0,
+                    uniqueStudents: new Set(),
+                    lastSessionDate: appt.date,
+                    lastSlot: appt.slot,
+                };
+            }
+            const dEntry = doctorMap[docId];
+            dEntry.totalSessions++;
+            if (appt.status === 'COMPLETED') dEntry.completedSessions++;
+            else if (appt.status === 'CANCELLED') dEntry.cancelledSessions++;
+            else dEntry.scheduledSessions++;
+
+            if (appt.anonymousId) dEntry.uniqueStudents.add(appt.anonymousId);
+            if (appt.date > dEntry.lastSessionDate) {
+                dEntry.lastSessionDate = appt.date;
+                dEntry.lastSlot = appt.slot;
+            }
+        }
+
+        // Students aggregation
+        const anonId = appt.anonymousId;
+        if (anonId) {
+            if (!studentMap[anonId]) {
+                studentMap[anonId] = {
+                    anonymousId: anonId,
+                    totalSessions: 0,
+                    completedSessions: 0,
+                    scheduledSessions: 0,
+                    cancelledSessions: 0,
+                    doctorsInvolved: new Set(),
+                    lastSessionDate: appt.date,
+                    lastSlot: appt.slot,
+                };
+            }
+            const sEntry = studentMap[anonId];
+            sEntry.totalSessions++;
+            if (appt.status === 'COMPLETED') sEntry.completedSessions++;
+            else if (appt.status === 'CANCELLED') sEntry.cancelledSessions++;
+            else sEntry.scheduledSessions++;
+
+            if (appt.doctorId && appt.doctorId.fullName) {
+                sEntry.doctorsInvolved.add(appt.doctorId.fullName);
+            }
+            if (appt.date > sEntry.lastSessionDate) {
+                sEntry.lastSessionDate = appt.date;
+                sEntry.lastSlot = appt.slot;
+            }
+        }
+    }
+
+    // Match students with their latest assessment severity tier & check critical status
+    const studentAnonIds = Object.keys(studentMap);
+    const assessments = studentAnonIds.length > 0
+        ? await Assessment.find({ orgId: orgObjectId, anonymousId: { $in: studentAnonIds } })
+            .select('anonymousId severityTier doctorStatus createdAt')
+            .sort({ createdAt: -1 })
+            .lean()
+        : [];
+
+    const anonSeverityMap = {};
+    const anonStatusMap = {};
+    for (const ass of assessments) {
+        if (!anonSeverityMap[ass.anonymousId]) {
+            anonSeverityMap[ass.anonymousId] = ass.severityTier;
+            anonStatusMap[ass.anonymousId] = ass.doctorStatus || 'UNREVIEWED';
+        }
+    }
+
+    // Doctors who have treated at least 1 student (or have appointments)
+    const treatedDoctors = Object.values(doctorMap)
+        .map((d) => ({
+            doctorId: d.doctorId,
+            fullName: d.fullName,
+            email: d.email,
+            completedSessions: d.completedSessions,
+            scheduledSessions: d.scheduledSessions,
+            cancelledSessions: d.cancelledSessions,
+            totalSessions: d.totalSessions,
+            uniqueStudentsCount: d.uniqueStudents.size,
+            uniqueStudents: Array.from(d.uniqueStudents),
+            lastSessionDate: d.lastSessionDate,
+            lastSlot: d.lastSlot,
+        }))
+        .filter((d) => d.totalSessions > 0)
+        .sort((a, b) => b.completedSessions - a.completedSessions || b.totalSessions - a.totalSessions);
+
+    // Students who have received treatment / counseling
+    const treatedStudents = Object.values(studentMap)
+        .map((s) => ({
+            anonymousId: s.anonymousId,
+            totalSessions: s.totalSessions,
+            completedSessions: s.completedSessions,
+            scheduledSessions: s.scheduledSessions,
+            cancelledSessions: s.cancelledSessions,
+            doctorsInvolved: Array.from(s.doctorsInvolved),
+            lastSessionDate: s.lastSessionDate,
+            lastSlot: s.lastSlot,
+            severityTier: anonSeverityMap[s.anonymousId] || 'MODERATE',
+            doctorStatus: anonStatusMap[s.anonymousId] || 'IN_CARE',
+        }))
+        .filter((s) => s.totalSessions > 0)
+        .sort((a, b) => b.completedSessions - a.completedSessions || b.totalSessions - a.totalSessions);
+
+    const completionRate = totalBooked > 0 ? Math.round((completedCount / totalBooked) * 100) : 0;
+
+    const counselingAnalytics = {
+        totalBooked,
+        completedCount,
+        scheduledCount,
+        cancelledCount,
+        doctorInitiatedCount,
+        studentInitiatedCount,
+        completionRate,
+        uniqueStudentsTreated: treatedStudents.length,
+        uniqueDoctorsActive: treatedDoctors.length,
+    };
+
+    return {
+        counselingAnalytics,
+        treatedDoctors,
+        treatedStudents,
+    };
 };
 
 const getAnalytics = async (req, res) => {
@@ -331,6 +537,8 @@ const getAnalytics = async (req, res) => {
             }
         }
 
+        const { counselingAnalytics, treatedDoctors, treatedStudents } = await buildCounselingAndTreatmentRecords(orgObjectId);
+
         return res.json({
             month: req.query.month || 'all-time',
             organization: org
@@ -346,9 +554,26 @@ const getAnalytics = async (req, res) => {
             severityCounts,
             averageScores,
             aiBulletPoints,
+            counselingAnalytics,
+            treatedDoctors,
+            treatedStudents,
         });
     } catch (err) {
         return res.status(500).json({ message: 'Failed to generate analytics', error: err.message });
+    }
+};
+
+const getClinicalTreatmentRecords = async (req, res) => {
+    try {
+        const orgId = await resolveAdminOrgId(req.user);
+        if (!orgId) {
+            return res.status(400).json({ message: 'Admin is not linked to an organization' });
+        }
+        const orgObjectId = new mongoose.Types.ObjectId(orgId);
+        const data = await buildCounselingAndTreatmentRecords(orgObjectId);
+        return res.json(data);
+    } catch (err) {
+        return res.status(500).json({ message: 'Failed to fetch treatment records', error: err.message });
     }
 };
 
@@ -421,6 +646,8 @@ module.exports = {
     getMyOrganization,
     createOrganization,
     getAnonymousProfiles,
+    getAnonymousPatientHistory,
     getAnalytics,
     getAiAnalyticsSummary,
+    getClinicalTreatmentRecords,
 };
