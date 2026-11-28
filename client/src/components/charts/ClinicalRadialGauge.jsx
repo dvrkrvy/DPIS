@@ -1,3 +1,5 @@
+import { useTheme } from '../../context/ThemeContext';
+
 export default function ClinicalRadialGauge({
   title,
   instrument,
@@ -12,22 +14,31 @@ export default function ClinicalRadialGauge({
   ],
   description = '',
 }) {
+  const { isDark } = useTheme();
   const clampedScore = Math.max(0, Math.min(score, maxScore));
   const fraction = maxScore > 0 ? clampedScore / maxScore : 0;
-  
+
   // 180 degree gauge from 180 deg (left) to 0 deg (right)
   const angleDeg = 180 - fraction * 180;
   const angleRad = (angleDeg * Math.PI) / 180;
 
-  // Center (80, 80), radius 60
+  // Center (80, 80), radius 58
   const cx = 80;
   const cy = 80;
   const radius = 58;
 
-  // Needle tip
-  const needleLen = 46;
+  // Tapered speedometer pointer polygon (avoids 0-height SVG line clipping)
+  const needleLen = 48;
   const tipX = cx + needleLen * Math.cos(angleRad);
   const tipY = cy - needleLen * Math.sin(angleRad);
+  const baseHalf = 3.2;
+  const bx1 = cx + baseHalf * Math.sin(angleRad);
+  const by1 = cy + baseHalf * Math.cos(angleRad);
+  const bx2 = cx - baseHalf * Math.sin(angleRad);
+  const by2 = cy - baseHalf * Math.cos(angleRad);
+  const tailX = cx - 7 * Math.cos(angleRad);
+  const tailY = cy + 7 * Math.sin(angleRad);
+  const needleColor = isDark ? '#f4f4f7' : '#18181b';
 
   // Determine active zone
   const activeZone =
@@ -104,17 +115,15 @@ export default function ClinicalRadialGauge({
           <circle cx="138" cy="80" r="3" fill="#e07a5f" />
 
           {/* Needle */}
-          <line
-            x1={cx}
-            y1={cy}
-            x2={tipX}
-            y2={tipY}
-            stroke="#f5f5f7"
-            strokeWidth="3"
-            strokeLinecap="round"
-            className="drop-shadow-sm transition-all duration-500"
+          <polygon
+            points={`${bx1},${by1} ${tipX},${tipY} ${bx2},${by2} ${tailX},${tailY}`}
+            fill={needleColor}
+            stroke={needleColor}
+            strokeWidth="1"
+            strokeLinejoin="round"
+            className="transition-all duration-500"
           />
-          <circle cx={cx} cy={cy} r="6" fill="#f5f5f7" />
+          <circle cx={cx} cy={cy} r="6.5" fill={needleColor} />
           <circle cx={cx} cy={cy} r="3" fill={activeZone.color} />
         </svg>
 

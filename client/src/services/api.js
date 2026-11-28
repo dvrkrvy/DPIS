@@ -140,4 +140,44 @@ export const appointmentApi = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  startMeeting: (id, payload = {}) =>
+    request(`/api/appointments/${id}/meet/start`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  endMeeting: (id) =>
+    request(`/api/appointments/${id}/meet/end`, {
+      method: 'POST',
+    }),
+};
+
+export const googleApi = {
+  getStatus: () => request('/api/google/status'),
+  getAuthUrl: (origin) =>
+    request(`/api/google/auth-url?origin=${encodeURIComponent(origin || window.location.origin)}`),
+  disconnect: () =>
+    request('/api/google/disconnect', {
+      method: 'DELETE',
+    }),
+};
+
+export const messageApi = {
+  getUnreadCount: () => request('/api/messages/unread-count'),
+  getThreads: () => request('/api/messages/threads'),
+  getMessages: (partnerId) => request(`/api/messages/threads/${encodeURIComponent(partnerId)}`),
+  sendMessage: (partnerId, content) =>
+    request(`/api/messages/threads/${encodeURIComponent(partnerId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+};
+
+export const profileApi = {
+  getMe: () => request('/api/profile/me'),
+  updateMe: (payload) =>
+    request('/api/profile/me', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  getById: (targetId) => request(`/api/profile/${encodeURIComponent(targetId)}`),
 };

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 
 const SEVERITY_COLORS = {
   LOW: '#8fa986',
@@ -8,6 +9,7 @@ const SEVERITY_COLORS = {
 };
 
 export default function MonthlyTrendsChart({ monthlyData = [] }) {
+  const { isDark } = useTheme();
   const [viewMode, setViewMode] = useState('bars'); // 'bars' | 'lines'
   const [hoveredMonth, setHoveredMonth] = useState(null);
 
@@ -82,10 +84,10 @@ export default function MonthlyTrendsChart({ monthlyData = [] }) {
           <button
             type="button"
             onClick={() => setViewMode('bars')}
-            className={`px-3 py-1 rounded-md font-label-sm text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-md font-label-sm text-xs transition-all cursor-pointer ${
               viewMode === 'bars'
-                ? 'bg-surface-container-lowest dark:bg-surface-container-highest text-on-surface dark:text-inverse-on-surface shadow-sm'
-                : 'text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface'
+                ? 'bg-primary-fixed dark:bg-primary-container border border-primary/40 dark:border-primary-fixed-dim/50 text-stone-900 dark:text-white font-bold shadow-sm'
+                : 'border border-transparent text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface dark:hover:text-inverse-on-surface font-medium'
             }`}
           >
             Severity Bars
@@ -93,10 +95,10 @@ export default function MonthlyTrendsChart({ monthlyData = [] }) {
           <button
             type="button"
             onClick={() => setViewMode('lines')}
-            className={`px-3 py-1 rounded-md font-label-sm text-xs font-medium transition-all ${
+            className={`px-3 py-1 rounded-md font-label-sm text-xs transition-all cursor-pointer ${
               viewMode === 'lines'
-                ? 'bg-surface-container-lowest dark:bg-surface-container-highest text-on-surface dark:text-inverse-on-surface shadow-sm'
-                : 'text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface'
+                ? 'bg-primary-fixed dark:bg-primary-container border border-primary/40 dark:border-primary-fixed-dim/50 text-stone-900 dark:text-white font-bold shadow-sm'
+                : 'border border-transparent text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface dark:hover:text-inverse-on-surface font-medium'
             }`}
           >
             Score Trajectory
@@ -302,9 +304,9 @@ export default function MonthlyTrendsChart({ monthlyData = [] }) {
                     </text>
 
                     {/* Circles */}
-                    <circle cx={x} cy={yPhq} r="4" fill="#8fa986" stroke="#121318" strokeWidth="1.5" />
-                    <circle cx={x} cy={yGad} r="4" fill="#d4af37" stroke="#121318" strokeWidth="1.5" />
-                    <circle cx={x} cy={yPss} r="4" fill="#e07a5f" stroke="#121318" strokeWidth="1.5" />
+                    <circle cx={x} cy={yPhq} r="4" fill="#8fa986" stroke={isDark ? '#121318' : '#ffffff'} strokeWidth="1.5" />
+                    <circle cx={x} cy={yGad} r="4" fill="#d4af37" stroke={isDark ? '#121318' : '#ffffff'} strokeWidth="1.5" />
+                    <circle cx={x} cy={yPss} r="4" fill="#e07a5f" stroke={isDark ? '#121318' : '#ffffff'} strokeWidth="1.5" />
                   </g>
                 );
               })}

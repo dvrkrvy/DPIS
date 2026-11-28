@@ -16,7 +16,7 @@ export default function TriageFunnelChart({ funnel = {} }) {
       count: total,
       pct: 100,
       icon: 'groups',
-      color: 'bg-primary dark:bg-primary-fixed-dim text-on-primary dark:text-on-primary-fixed',
+      color: 'bg-[#33452f] dark:bg-[#3f573a] text-white',
       barColor: 'bg-primary dark:bg-primary-fixed-dim',
     },
     {
@@ -25,7 +25,7 @@ export default function TriageFunnelChart({ funnel = {} }) {
       count: flagged,
       pct: total > 0 ? Math.round((flagged / total) * 100) : 0,
       icon: 'warning',
-      color: 'bg-[#d4af37] text-black',
+      color: 'bg-[#d4af37] text-stone-900',
       barColor: 'bg-[#d4af37]',
     },
     {
@@ -34,7 +34,7 @@ export default function TriageFunnelChart({ funnel = {} }) {
       count: contacted,
       pct: flagged > 0 ? Math.round((contacted / flagged) * 100) : 0,
       icon: 'contact_phone',
-      color: 'bg-[#8fa986] text-black',
+      color: 'bg-[#8fa986] text-stone-900',
       barColor: 'bg-[#8fa986]',
     },
     {
@@ -43,8 +43,8 @@ export default function TriageFunnelChart({ funnel = {} }) {
       count: inCare + resolved,
       pct: flagged > 0 ? Math.round(((inCare + resolved) / flagged) * 100) : 0,
       icon: 'health_and_safety',
-      color: 'bg-primary text-on-primary',
-      barColor: 'bg-primary',
+      color: 'bg-[#33452f] dark:bg-[#3f573a] text-white',
+      barColor: 'bg-primary dark:bg-primary-fixed-dim',
     },
   ];
 

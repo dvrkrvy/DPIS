@@ -1,6 +1,14 @@
+const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const UserIdentity = require('../models/UserIdentity');
 const Assessment = require('../models/Assessment');
+const {
+    isGoogleOAuthConfigured,
+    getValidDoctorGoogleAuth,
+    createGoogleMeetSession,
+    normalizeGoogleMeetUrl,
+    buildHostJoinUrl,
+} = require('../services/googleMeet.service');
 
 const COUNSELING_SLOTS = [
     { id: 'slot-1', slot: '17:00-17:25', start: '17:00', end: '17:25', label: '05:00 PM – 05:25 PM' },
@@ -99,7 +107,7 @@ const getSlotAvailability = async (req, res) => {
 
 const bookAppointment = async (req, res) => {
     try {
-        const { date, slot, reason, notes } = req.body;
+        const { date, slot, reason, notes, doctorId } = req.body;
 
         if (!date || !slot) {
             return res.status(400).json({ message: 'Date and slot are required' });
@@ -115,8 +123,20 @@ const bookAppointment = async (req, res) => {
             return res.status(400).json({ message: 'You must belong to an organization to book counseling' });
         }
 
+        const studentConflict = await Appointment.exists({
+            studentId: student._id,
+            date,
+            slot,
+            status: { $in: ['SCHEDULED', 'RESCHEDULED'] },
+        });
+        if (studentConflict) {
+            return res.status(400).json({
+                message: 'You already have an appointment scheduled in this time slot.',
+            });
+        }
+
         // Find all doctors
-        const allDoctors = await UserIdentity.find({ role: 'DOCTOR' }).select('_id');
+        const allDoctors = await UserIdentity.find({ role: 'DOCTOR' }).select('_id fullName');
         if (allDoctors.length === 0) {
             return res.status(400).json({ message: 'No clinicians are currently active in the platform' });
         }
@@ -129,17 +149,58 @@ const bookAppointment = async (req, res) => {
         }).select('doctorId');
 
         const bookedDoctorIds = new Set(booked.map((b) => String(b.doctorId)));
-        const freeDoctor = allDoctors.find((d) => !bookedDoctorIds.has(String(d._id)));
+        let selectedDoctor = null;
 
-        if (!freeDoctor) {
-            return res.status(400).json({ message: 'Selected slot is fully booked. Please choose another time slot.' });
+        if (doctorId) {
+            if (!mongoose.Types.ObjectId.isValid(doctorId)) {
+                return res.status(400).json({ message: 'Invalid doctor identifier' });
+            }
+
+            const hasPriorSession = await Appointment.exists({
+                studentId: student._id,
+                doctorId,
+                status: { $ne: 'CANCELLED' },
+            });
+            if (!hasPriorSession) {
+                return res.status(403).json({
+                    message:
+                        'You can only book directly with a doctor you have previously had a session with. Use the Counseling Calendar to match with a new available doctor.',
+                });
+            }
+
+            selectedDoctor = allDoctors.find((d) => String(d._id) === String(doctorId));
+            if (!selectedDoctor) {
+                return res.status(404).json({ message: 'Selected clinician not found' });
+            }
+
+            if (bookedDoctorIds.has(String(selectedDoctor._id))) {
+                return res.status(400).json({
+                    message: 'This doctor is already booked in the selected time slot. Please choose another slot or date.',
+                });
+            }
+        } else {
+            const freeDoctors = allDoctors.filter((d) => !bookedDoctorIds.has(String(d._id)));
+            if (freeDoctors.length === 0) {
+                return res.status(400).json({ message: 'Selected slot is fully booked. Please choose another time slot.' });
+            }
+
+            const priorDoctorIds = await Appointment.find({
+                studentId: student._id,
+                status: { $ne: 'CANCELLED' },
+            }).distinct('doctorId');
+            const priorSet = new Set(priorDoctorIds.map((id) => String(id)));
+
+            // Prefer matching with a random new doctor if any free doctor hasn't seen this student yet
+            const newFreeDoctors = freeDoctors.filter((d) => !priorSet.has(String(d._id)));
+            const candidatePool = newFreeDoctors.length > 0 ? newFreeDoctors : freeDoctors;
+            selectedDoctor = candidatePool[Math.floor(Math.random() * candidatePool.length)];
         }
 
         const appt = await Appointment.create({
             studentId: student._id,
             anonymousId: student.anonymousId,
             orgId: student.orgId,
-            doctorId: freeDoctor._id,
+            doctorId: selectedDoctor._id,
             date,
             slot,
             slotStart: slotInfo.start,
@@ -150,7 +211,9 @@ const bookAppointment = async (req, res) => {
         });
 
         return res.status(201).json({
-            message: 'Counseling appointment booked successfully',
+            message: doctorId
+                ? `Session booked with Dr. ${selectedDoctor.fullName}`
+                : 'Counseling appointment booked with an available clinician',
             appointment: appt,
         });
     } catch (err) {
@@ -303,7 +366,10 @@ const getDoctorAppointments = async (req, res) => {
             query.date = date;
         }
 
+        const doctor = await UserIdentity.findById(req.user.userId).select('googleAuth.email').lean();
+
         const appointments = await Appointment.find(query)
+            .select('+meetingHostEmail')
             .populate('orgId', 'name type')
             .sort({ date: 1, slotStart: 1 })
             .lean();
@@ -332,11 +398,17 @@ const getDoctorAppointments = async (req, res) => {
             };
         }
 
-        const result = appointments.map((a) => ({
-            ...a,
-            patient: criticalAnonSet.has(a.anonymousId) ? identityMap[a.anonymousId] || null : null,
-            isCritical: criticalAnonSet.has(a.anonymousId),
-        }));
+        const result = appointments.map((a) => {
+            const { meetingHostEmail, ...rest } = a;
+            return {
+                ...rest,
+                hostJoinLink: a.meetingLink
+                    ? buildHostJoinUrl(a.meetingLink, meetingHostEmail || doctor?.googleAuth?.email || '')
+                    : '',
+                patient: criticalAnonSet.has(a.anonymousId) ? identityMap[a.anonymousId] || null : null,
+                isCritical: criticalAnonSet.has(a.anonymousId),
+            };
+        });
 
         return res.json({ appointments: result });
     } catch (err) {
@@ -358,7 +430,15 @@ const updateAppointmentStatus = async (req, res) => {
             return res.status(404).json({ message: 'Appointment not found' });
         }
 
+        if (String(appt.doctorId) !== String(req.user.userId)) {
+            return res.status(403).json({ message: 'Not authorized to update this appointment' });
+        }
+
         appt.status = status;
+        if ((status === 'COMPLETED' || status === 'CANCELLED') && appt.meetingStatus === 'LIVE') {
+            appt.meetingStatus = 'ENDED';
+            appt.meetingEndedAt = new Date();
+        }
         await appt.save();
 
         return res.json({
@@ -367,6 +447,153 @@ const updateAppointmentStatus = async (req, res) => {
         });
     } catch (err) {
         return res.status(500).json({ message: 'Failed to update appointment status', error: err.message });
+    }
+};
+
+const startAppointmentMeeting = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { meetingLink: rawLink } = req.body || {};
+
+        const appt = await Appointment.findById(id).select('+meetingHostEmail +googleEventId');
+        if (!appt) {
+            return res.status(404).json({ message: 'Appointment not found' });
+        }
+
+        if (String(appt.doctorId) !== String(req.user.userId)) {
+            return res.status(403).json({ message: 'Only the assigned doctor can host this meeting' });
+        }
+
+        if (appt.status === 'CANCELLED') {
+            return res.status(400).json({ message: 'Cannot start a meeting for a cancelled appointment' });
+        }
+
+        const doctorDoc = await UserIdentity.findById(req.user.userId).select('googleAuth.email').lean();
+        const fallbackHostEmail = doctorDoc?.googleAuth?.email || '';
+
+        // Path A: Doctor attached a newly launched instant Google Meet link (or replaced an existing one)
+        if (rawLink && String(rawLink).trim()) {
+            const normalized = normalizeGoogleMeetUrl(String(rawLink));
+            if (!normalized) {
+                return res.status(400).json({
+                    message: 'Please provide a valid Google Meet URL (https://meet.google.com/xxx-yyyy-zzz) or meeting code.',
+                });
+            }
+
+            appt.meetingProvider = 'GOOGLE_MEET';
+            appt.meetingLink = normalized.meetingLink;
+            appt.meetingCode = normalized.meetingCode;
+            appt.meetingStatus = 'LIVE';
+            appt.meetingStartedAt = appt.meetingStartedAt || new Date();
+            appt.meetingEndedAt = null;
+            if (!appt.meetingHostEmail && fallbackHostEmail) {
+                appt.meetingHostEmail = fallbackHostEmail;
+            }
+            await appt.save();
+
+            const hostJoinLink = buildHostJoinUrl(appt.meetingLink, appt.meetingHostEmail || fallbackHostEmail);
+            return res.json({
+                message: 'Google Meet session is now LIVE and shared with the student.',
+                mode: 'HOST_ATTACHED',
+                hostJoinLink,
+                appointment: {
+                    ...appt.toObject(),
+                    meetingHostEmail: undefined,
+                    googleEventId: undefined,
+                    hostJoinLink,
+                },
+            });
+        }
+
+        // Path B: Appointment already has a Meet link — resume/join as host
+        if (appt.meetingLink) {
+            appt.meetingStatus = 'LIVE';
+            appt.meetingStartedAt = appt.meetingStartedAt || new Date();
+            appt.meetingEndedAt = null;
+            await appt.save();
+
+            const hostJoinLink = buildHostJoinUrl(appt.meetingLink, appt.meetingHostEmail || fallbackHostEmail);
+            return res.json({
+                message: 'Google Meet session resumed. Joining as Host/Admin.',
+                mode: 'EXISTING_MEET',
+                hostJoinLink,
+                appointment: {
+                    ...appt.toObject(),
+                    meetingHostEmail: undefined,
+                    googleEventId: undefined,
+                    hostJoinLink,
+                },
+            });
+        }
+
+        // Path C: Auto-create a real Google Meet via Doctor's connected Google OAuth Calendar API
+        const googleOAuthConfigured = isGoogleOAuthConfigured();
+        const doctorGoogleAuth = googleOAuthConfigured ? await getValidDoctorGoogleAuth(req.user.userId) : null;
+
+        if (!doctorGoogleAuth) {
+            return res.status(400).json({
+                code: 'GOOGLE_NOT_CONNECTED',
+                googleOAuthConfigured,
+                message: googleOAuthConfigured
+                    ? 'Connect your Google account for 1-click auto-creation, or launch Google Meet as Host and attach the room link.'
+                    : 'Launch Google Meet as Host and paste the room link once to share with the student (or configure Google OAuth in .env for 1-click auto-creation).',
+            });
+        }
+
+        const created = await createGoogleMeetSession({
+            accessToken: doctorGoogleAuth.accessToken,
+            appointment: appt,
+        });
+
+        appt.meetingProvider = 'GOOGLE_MEET';
+        appt.meetingLink = created.meetingLink;
+        appt.meetingCode = created.meetingCode;
+        appt.googleEventId = created.googleEventId;
+        appt.meetingHostEmail = doctorGoogleAuth.email || fallbackHostEmail;
+        appt.meetingStatus = 'LIVE';
+        appt.meetingStartedAt = new Date();
+        appt.meetingEndedAt = null;
+        await appt.save();
+
+        const hostJoinLink = buildHostJoinUrl(appt.meetingLink, appt.meetingHostEmail);
+        return res.json({
+            message: 'Google Meet session created and LIVE! You are the Host/Admin.',
+            mode: 'GOOGLE_OAUTH_AUTO',
+            hostJoinLink,
+            appointment: {
+                ...appt.toObject(),
+                meetingHostEmail: undefined,
+                googleEventId: undefined,
+                hostJoinLink,
+            },
+        });
+    } catch (err) {
+        return res.status(500).json({ message: err.message || 'Failed to start Google Meet session' });
+    }
+};
+
+const endAppointmentMeeting = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const appt = await Appointment.findById(id);
+        if (!appt) {
+            return res.status(404).json({ message: 'Appointment not found' });
+        }
+
+        if (String(appt.doctorId) !== String(req.user.userId)) {
+            return res.status(403).json({ message: 'Only the assigned doctor can end this meeting' });
+        }
+
+        appt.meetingStatus = 'ENDED';
+        appt.meetingEndedAt = new Date();
+        await appt.save();
+
+        return res.json({
+            message: 'Google Meet session ended',
+            appointment: appt,
+        });
+    } catch (err) {
+        return res.status(500).json({ message: 'Failed to end Google Meet session', error: err.message });
     }
 };
 
@@ -379,4 +606,6 @@ module.exports = {
     getMyAppointments,
     getDoctorAppointments,
     updateAppointmentStatus,
+    startAppointmentMeeting,
+    endAppointmentMeeting,
 };

@@ -9,14 +9,14 @@ import ComorbidityScatterPlot from '../components/charts/ComorbidityScatterPlot'
 
 const SEVERITY_BADGE_MAP = {
   CRITICAL: 'bg-error-container text-on-error-container',
-  HIGH: 'bg-tertiary-container text-on-tertiary',
-  MODERATE: 'bg-primary-fixed text-on-primary-fixed-variant',
+  HIGH: 'bg-tertiary-container text-white',
+  MODERATE: 'bg-primary-fixed text-on-primary-fixed-variant dark:text-on-primary-container',
   LOW: 'bg-secondary-container text-on-secondary-container',
 };
 
 const DOCTOR_STATUS_BADGE_MAP = {
-  IN_CARE: 'bg-primary-fixed text-on-primary-fixed',
-  RESOLVED: 'bg-primary-fixed text-on-primary-fixed',
+  IN_CARE: 'bg-primary-fixed text-on-primary-fixed dark:text-on-primary-container',
+  RESOLVED: 'bg-primary-fixed text-on-primary-fixed dark:text-on-primary-container',
   CONTACTED: 'bg-secondary-container text-on-secondary-container',
   UNREVIEWED: 'bg-surface-container-high dark:bg-on-primary-fixed text-on-surface-variant dark:text-tertiary-fixed-dim',
 };
@@ -409,7 +409,7 @@ export default function AdminDashboard() {
             {error}
           </p>
           <button
-            className="px-space-md py-space-sm rounded-lg bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container font-label-lg transition-colors w-fit"
+            className="px-space-md py-space-sm rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-lg transition-colors w-fit"
             onClick={checkAdminOrg}
             type="button"
           >
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
             </div>
 
             <button
-              className="mt-space-sm bg-primary hover:bg-primary-container disabled:opacity-60 text-on-primary font-label-lg text-label-lg px-space-lg py-3 rounded-lg transition-colors shadow-sm cursor-pointer"
+              className="mt-space-sm bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] disabled:opacity-60 text-white font-label-lg text-label-lg px-space-lg py-3 rounded-lg transition-colors shadow-sm cursor-pointer"
               disabled={creatingOrg}
               type="submit"
             >
@@ -590,7 +590,7 @@ export default function AdminDashboard() {
                 Organization Dashboard
               </span>
               <span className="text-outline-variant">•</span>
-              <span className="font-label-sm text-label-sm text-primary dark:text-on-primary-fixed bg-primary-fixed px-space-sm py-0.5 rounded">
+              <span className="font-label-sm text-label-sm text-primary dark:text-on-primary-container bg-primary-fixed px-space-sm py-0.5 rounded">
                 {organization.type}
               </span>
               {organization.emailDomain && (
@@ -734,7 +734,7 @@ export default function AdminDashboard() {
             <div className="p-space-md rounded-xl bg-surface-container-low dark:bg-surface-container border border-outline-variant/50 flex flex-col justify-between gap-space-sm">
               <div className="flex items-center justify-between">
                 <span className="font-label-lg text-xs font-bold text-on-surface dark:text-inverse-on-surface flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[18px] text-primary">donut_small</span>
+                  <span className="material-symbols-outlined text-[18px] text-primary dark:text-primary-fixed-dim">donut_small</span>
                   <span>Session Outcome &amp; Status Funnel</span>
                 </span>
                 <span className="text-xs font-mono font-bold text-on-surface dark:text-inverse-on-surface">
@@ -849,7 +849,7 @@ export default function AdminDashboard() {
                 onClick={() => setTreatmentView('doctors')}
                 className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   treatmentView === 'doctors'
-                    ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                    ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
@@ -862,7 +862,7 @@ export default function AdminDashboard() {
                 onClick={() => setTreatmentView('students')}
                 className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   treatmentView === 'students'
-                    ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                    ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
@@ -929,7 +929,7 @@ export default function AdminDashboard() {
                       <tr key={doc.doctorId} className="hover:bg-surface-container-low/50 transition-colors">
                         <td className="py-3 px-3">
                           <div className="font-bold text-on-surface dark:text-inverse-on-surface flex items-center gap-1.5">
-                            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[11px]">
+                            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary dark:text-primary-fixed-dim flex items-center justify-center font-bold text-[11px]">
                               Dr
                             </span>
                             <span>{doc.fullName}</span>
@@ -968,7 +968,7 @@ export default function AdminDashboard() {
                         </td>
 
                         <td className="py-3 px-3 text-right">
-                          <span className="px-2.5 py-1 rounded-full font-label-sm text-[10px] font-bold bg-primary-fixed text-on-primary-fixed">
+                          <span className="px-2.5 py-1 rounded-full font-label-sm text-[10px] font-bold bg-primary-fixed text-on-primary-fixed dark:text-on-primary-container">
                             Active Caregiver
                           </span>
                         </td>
@@ -1284,7 +1284,7 @@ export default function AdminDashboard() {
             <div className="p-space-md rounded-xl bg-surface-container-low dark:bg-surface-container border border-outline-variant/50 flex flex-col justify-between gap-space-sm">
               <div className="flex items-center justify-between">
                 <span className="font-label-lg text-xs font-bold text-on-surface dark:text-inverse-on-surface flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[18px] text-primary">donut_small</span>
+                  <span className="material-symbols-outlined text-[18px] text-primary dark:text-primary-fixed-dim">donut_small</span>
                   <span>Session Outcome &amp; Status Funnel</span>
                 </span>
                 <span className="text-xs font-mono font-bold text-on-surface dark:text-inverse-on-surface">
@@ -1399,7 +1399,7 @@ export default function AdminDashboard() {
                 onClick={() => setTreatmentView('doctors')}
                 className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   treatmentView === 'doctors'
-                    ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                    ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
@@ -1412,7 +1412,7 @@ export default function AdminDashboard() {
                 onClick={() => setTreatmentView('students')}
                 className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   treatmentView === 'students'
-                    ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                    ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
@@ -1479,7 +1479,7 @@ export default function AdminDashboard() {
                       <tr key={doc.doctorId} className="hover:bg-surface-container-low/50 transition-colors">
                         <td className="py-3 px-3">
                           <div className="font-bold text-on-surface dark:text-inverse-on-surface flex items-center gap-1.5">
-                            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[11px]">
+                            <span className="w-6 h-6 rounded-full bg-primary/10 text-primary dark:text-primary-fixed-dim flex items-center justify-center font-bold text-[11px]">
                               Dr
                             </span>
                             <span>{doc.fullName}</span>
@@ -1518,7 +1518,7 @@ export default function AdminDashboard() {
                         </td>
 
                         <td className="py-3 px-3 text-right">
-                          <span className="px-2.5 py-1 rounded-full font-label-sm text-[10px] font-bold bg-primary-fixed text-on-primary-fixed">
+                          <span className="px-2.5 py-1 rounded-full font-label-sm text-[10px] font-bold bg-primary-fixed text-on-primary-fixed dark:text-on-primary-container">
                             Active Caregiver
                           </span>
                         </td>
@@ -1637,7 +1637,7 @@ export default function AdminDashboard() {
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
             <div className="flex items-center gap-space-sm">
-              <span className="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center">
+              <span className="w-8 h-8 rounded-lg bg-[#33452f] dark:bg-[#3f573a] text-white flex items-center justify-center">
                 <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
               </span>
               <h2 className="font-headline-md text-headline-md text-on-surface dark:text-inverse-on-surface">
@@ -1678,7 +1678,7 @@ export default function AdminDashboard() {
                   key={idx}
                   className="bg-surface-container-lowest dark:bg-on-primary-fixed rounded-lg p-space-md flex items-start gap-space-md"
                 >
-                  <span className="font-label-sm text-label-sm text-primary dark:text-on-primary-fixed bg-primary-fixed px-space-sm py-0.5 rounded shrink-0 mt-0.5">
+                  <span className="font-label-sm text-label-sm text-primary dark:text-on-primary-container bg-primary-fixed px-space-sm py-0.5 rounded shrink-0 mt-0.5">
                     {String(idx + 1).padStart(2, '0')}
                   </span>
                   <p className="font-body-md text-body-md text-on-surface dark:text-inverse-on-surface">
@@ -1718,7 +1718,7 @@ export default function AdminDashboard() {
                 onClick={() => setAdminScreeningView('profiles')}
                 className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   adminScreeningView === 'profiles'
-                    ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                    ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
@@ -1731,7 +1731,7 @@ export default function AdminDashboard() {
                 onClick={() => setAdminScreeningView('all')}
                 className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                   adminScreeningView === 'all'
-                    ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                    ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >

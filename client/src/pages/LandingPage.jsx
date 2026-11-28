@@ -48,7 +48,7 @@ export default function LandingPage() {
               <div className="flex flex-wrap items-center gap-space-md pt-space-sm">
                 {isAuthenticated ? (
                   <Link
-                    className="px-space-lg py-3 rounded-lg bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container dark:bg-primary-fixed-dim dark:text-on-primary-fixed dark:hover:bg-primary-fixed font-label-lg text-label-lg shadow-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-space-sm"
+                    className="px-space-lg py-3 rounded-lg bg-[#33452f] text-white hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:text-white dark:hover:bg-[#4e6b48] font-label-lg text-label-lg shadow-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-space-sm"
                     to="/dashboard"
                   >
                     <span>Open Your Dashboard</span>
@@ -57,7 +57,7 @@ export default function LandingPage() {
                 ) : (
                   <>
                     <Link
-                      className="px-space-lg py-3 rounded-lg bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container dark:bg-primary-fixed-dim dark:text-on-primary-fixed dark:hover:bg-primary-fixed font-label-lg text-label-lg shadow-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-space-sm"
+                      className="px-space-lg py-3 rounded-lg bg-[#33452f] text-white hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:text-white dark:hover:bg-[#4e6b48] font-label-lg text-label-lg shadow-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-space-sm"
                       to="/register"
                     >
                       <span>Get Started</span>
@@ -100,7 +100,7 @@ export default function LandingPage() {
                   src={HERO_IMAGE_URL}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-on-primary-fixed/70 via-transparent to-transparent" />
-                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-on-primary">
+                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white">
                   <div>
                     <p className="font-label-sm text-label-sm uppercase tracking-wider opacity-90">
                       Monthly Check-In
@@ -360,7 +360,7 @@ export default function LandingPage() {
           </div>
 
           {/* Bottom Editorial Callout */}
-          <div className="mt-space-xl rounded-xl bg-primary text-on-primary dark:bg-primary-container dark:text-on-primary-container p-space-lg md:p-space-xl flex flex-col md:flex-row items-center justify-between gap-space-lg shadow-md">
+          <div className="mt-space-xl rounded-xl bg-[#33452f] text-white dark:bg-primary-container dark:text-on-primary-container p-space-lg md:p-space-xl flex flex-col md:flex-row items-center justify-between gap-space-lg shadow-md">
             <div className="flex items-center gap-space-lg max-w-2xl">
               <img
                 alt="DPIS Digital Psychological Intervention System"

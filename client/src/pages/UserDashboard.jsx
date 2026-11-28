@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { userApi, appointmentApi } from '../services/api';
+import { COUNSELING_SLOTS } from '../constants/counseling';
 
 const PHQ9_QUESTIONS = [
   'Little interest or pleasure in doing things',
@@ -179,7 +180,10 @@ const getNextDays = (count = 10) => {
   for (let i = 0; i < count; i++) {
     const d = new Date(now);
     d.setDate(now.getDate() + i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
     const label =
       i === 0
         ? 'Today'
@@ -311,12 +315,14 @@ export default function UserDashboard() {
 
   const loadSlotAvailability = async (date) => {
     setLoadingSlots(true);
+    setError('');
     try {
       const data = await appointmentApi.getAvailability({ date });
       setAvailableSlots(data.slots || []);
       setSelectedSlot('');
     } catch (err) {
-      console.warn('Failed to load slots:', err.message);
+      setAvailableSlots([]);
+      setError(err.message || 'Failed to load slot availability');
     } finally {
       setLoadingSlots(false);
     }
@@ -330,21 +336,57 @@ export default function UserDashboard() {
       setRescheduleSlots(data.slots || []);
       setRescheduleSelectedSlot('');
     } catch (err) {
+      setRescheduleSlots([]);
       setRescheduleError(err.message || 'Failed to load doctor slots');
     } finally {
       setLoadingRescheduleSlots(false);
     }
   };
 
+  const refreshAppointmentsQuiet = async () => {
+    try {
+      const data = await appointmentApi.getMyAppointments();
+      setMyAppointments(data.appointments || []);
+    } catch {
+      // Ignore silent background poll failures
+    }
+  };
+
+  const selectedCalendarDateRef = useRef(selectedCalendarDate);
+  selectedCalendarDateRef.current = selectedCalendarDate;
+
   useEffect(() => {
     loadReports();
     loadAppointments();
+
+    const handleOpenCounselingTab = () => {
+      setRetakingTest(false);
+      setActiveTab('doctor');
+    };
+    const handleAppointmentBooked = () => {
+      refreshAppointmentsQuiet();
+      loadSlotAvailability(selectedCalendarDateRef.current);
+    };
+
+    window.addEventListener('dpis:open-counseling-tab', handleOpenCounselingTab);
+    window.addEventListener('dpis:appointment-booked', handleAppointmentBooked);
+
+    return () => {
+      window.removeEventListener('dpis:open-counseling-tab', handleOpenCounselingTab);
+      window.removeEventListener('dpis:appointment-booked', handleAppointmentBooked);
+    };
   }, []);
 
   useEffect(() => {
     if (activeTab === 'doctor') {
       loadSlotAvailability(selectedCalendarDate);
       loadAppointments();
+
+      const pollTimer = setInterval(() => {
+        refreshAppointmentsQuiet();
+      }, 15000);
+
+      return () => clearInterval(pollTimer);
     }
   }, [activeTab, selectedCalendarDate]);
 
@@ -701,7 +743,7 @@ export default function UserDashboard() {
                     <span
                       className={`font-label-sm text-xs font-bold px-2 py-0.5 rounded ${
                         isActive
-                          ? 'bg-primary text-on-primary dark:bg-primary-fixed-dim dark:text-on-primary-fixed'
+                          ? 'bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-bold ring-1 ring-primary/40'
                           : 'bg-surface-container-high dark:bg-surface-container text-on-surface-variant'
                       }`}
                     >
@@ -763,9 +805,9 @@ export default function UserDashboard() {
                       onClick={() => jumpToQuestion(qIdx)}
                       className={`w-7 h-7 rounded-lg font-label-sm text-xs font-semibold transition-all cursor-pointer flex items-center justify-center ${
                         isCurrent
-                          ? 'bg-primary dark:bg-primary-fixed-dim text-on-primary dark:text-on-primary-fixed ring-2 ring-primary dark:ring-primary-fixed-dim ring-offset-2 dark:ring-offset-[#121318] scale-110 shadow-sm'
+                          ? 'bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white ring-2 ring-primary dark:ring-primary-fixed-dim ring-offset-2 dark:ring-offset-[#121318] scale-110 shadow-sm font-bold border border-primary'
                           : isAnswered
-                          ? 'bg-secondary-container dark:bg-primary-container text-on-secondary-container dark:text-on-primary-container hover:scale-105'
+                          ? 'bg-secondary-container dark:bg-surface-container-high text-stone-900 dark:text-white font-semibold hover:scale-105'
                           : 'border border-outline-variant text-on-surface-variant dark:text-tertiary-fixed-dim hover:bg-surface-container-high'
                       }`}
                       title={`Question ${qIdx + 1}: ${isAnswered ? 'Answered' : 'Unanswered'}`}
@@ -817,7 +859,7 @@ export default function UserDashboard() {
                       <span
                         className={`w-7 h-7 rounded-full font-label-sm text-xs font-bold flex items-center justify-center transition-colors shrink-0 ${
                           isSelected
-                            ? 'bg-primary dark:bg-primary-fixed-dim text-on-primary dark:text-on-primary-fixed'
+                            ? 'bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white border border-primary/40'
                             : 'bg-surface-container-high dark:bg-surface-container text-on-surface-variant dark:text-tertiary-fixed-dim'
                         }`}
                       >
@@ -838,12 +880,12 @@ export default function UserDashboard() {
                     <span
                       className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
                         isSelected
-                          ? 'border-primary dark:border-primary-fixed-dim bg-primary dark:bg-primary-fixed-dim'
+                          ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container'
                           : 'border-outline-variant'
                       }`}
                     >
                       {isSelected && (
-                        <span className="material-symbols-outlined text-[14px] text-on-primary dark:text-on-primary-fixed">
+                        <span className="material-symbols-outlined text-[14px] text-stone-900 dark:text-white">
                           check
                         </span>
                       )}
@@ -879,7 +921,7 @@ export default function UserDashboard() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="px-space-lg py-2.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  className="px-space-lg py-2.5 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                 >
                   {activeQuestionIndex < currentQuestions.length - 1 ? (
                     <>
@@ -944,7 +986,7 @@ export default function UserDashboard() {
               onClick={() => setActiveTab('overview')}
               className={`px-space-md py-2.5 rounded-t-lg font-label-lg text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
                 activeTab === 'overview'
-                  ? 'border-primary dark:border-primary-fixed-dim text-primary dark:text-primary-fixed-dim bg-surface-container-low/60 dark:bg-surface-container/50'
+                  ? 'border-primary dark:border-primary-fixed-dim text-stone-900 dark:text-white font-bold bg-surface-container-low/60 dark:bg-surface-container/50'
                   : 'border-transparent text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface hover:bg-surface-container-low/40'
               }`}
             >
@@ -962,7 +1004,7 @@ export default function UserDashboard() {
               onClick={() => setActiveTab('resources')}
               className={`px-space-md py-2.5 rounded-t-lg font-label-lg text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
                 activeTab === 'resources'
-                  ? 'border-primary dark:border-primary-fixed-dim text-primary dark:text-primary-fixed-dim bg-surface-container-low/60 dark:bg-surface-container/50'
+                  ? 'border-primary dark:border-primary-fixed-dim text-stone-900 dark:text-white font-bold bg-surface-container-low/60 dark:bg-surface-container/50'
                   : 'border-transparent text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface hover:bg-surface-container-low/40'
               }`}
             >
@@ -978,7 +1020,7 @@ export default function UserDashboard() {
               onClick={() => setActiveTab('doctor')}
               className={`px-space-md py-2.5 rounded-t-lg font-label-lg text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
                 activeTab === 'doctor'
-                  ? 'border-primary dark:border-primary-fixed-dim text-primary dark:text-primary-fixed-dim bg-surface-container-low/60 dark:bg-surface-container/50'
+                  ? 'border-primary dark:border-primary-fixed-dim text-stone-900 dark:text-white font-bold bg-surface-container-low/60 dark:bg-surface-container/50'
                   : 'border-transparent text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface hover:bg-surface-container-low/40'
               }`}
             >
@@ -1354,7 +1396,7 @@ export default function UserDashboard() {
                   <button
                     type="button"
                     onClick={() => setBreathingActive((prev) => !prev)}
-                    className="px-space-md py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                    className="px-space-md py-2 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                   >
                     <span className="material-symbols-outlined text-[16px]">
                       {breathingActive ? 'pause' : 'play_arrow'}
@@ -1462,17 +1504,37 @@ export default function UserDashboard() {
                           )}
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRescheduleModalAppt(dAppt);
-                            setRescheduleDate(dAppt.date);
-                          }}
-                          className="w-full py-2 rounded-lg bg-primary text-on-primary font-label-sm text-xs font-semibold hover:bg-primary-container flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">schedule</span>
-                          <span>Reschedule with Assigned Doctor</span>
-                        </button>
+                        <div className="flex flex-col gap-1.5 mt-1">
+                          {dAppt.meetingStatus === 'LIVE' && dAppt.meetingLink ? (
+                            <a
+                              href={dAppt.meetingLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-sm text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">video_call</span>
+                              <span>Join Live Google Meet ({dAppt.meetingCode || 'Room Ready'})</span>
+                              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                            </a>
+                          ) : (
+                            <div className="w-full py-1.5 px-2.5 rounded-lg bg-surface-container-high dark:bg-surface-container border border-outline-variant/50 text-on-surface-variant dark:text-tertiary-fixed-dim font-label-sm text-[11px] flex items-center justify-center gap-1.5">
+                              <span className="material-symbols-outlined text-[15px]">hourglass_top</span>
+                              <span>Waiting for Clinician (Host) to Start Google Meet</span>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRescheduleModalAppt(dAppt);
+                              setRescheduleDate(dAppt.date);
+                            }}
+                            className="w-full py-2 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">schedule</span>
+                            <span>Reschedule with Assigned Doctor</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1574,24 +1636,34 @@ export default function UserDashboard() {
                 {/* Left Column: Interactive 25-Min Slot Calendar (5 to 8 PM) */}
                 <div className="lg:col-span-7 flex flex-col gap-space-md">
                   <div className="rounded-xl bg-surface-container-lowest dark:bg-tertiary border border-outline-variant/60 p-space-lg shadow-sm flex flex-col gap-space-md">
-                    <div className="flex items-center justify-between pb-space-xs border-b border-outline-variant/40">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-space-xs border-b border-outline-variant/40">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-[22px]">
                             calendar_today
                           </span>
                           <h3 className="font-title-md text-title-md font-bold text-on-surface dark:text-inverse-on-surface">
-                            Book Counseling Session
+                            Book Counseling Session (New / Random Doctor)
                           </h3>
                         </div>
                         <p className="font-body-sm text-xs text-on-surface-variant dark:text-tertiary-fixed-dim mt-0.5">
-                          25-minute confidential appointments between 05:00 PM and 08:00 PM (5-min buffer).
+                          25-minute confidential appointments (05:00 PM – 08:00 PM) matching you with an available new clinician.
                         </p>
                       </div>
 
-                      <span className="px-2.5 py-1 rounded-full font-label-sm text-[11px] font-semibold bg-primary/10 text-primary dark:text-primary-fixed-dim">
-                        Self-Service Booking
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => window.dispatchEvent(new CustomEvent('dpis:open-messaging'))}
+                          className="px-2.5 py-1 rounded-full font-label-sm text-[11px] font-semibold bg-surface-container-low dark:bg-surface-container border border-outline-variant/60 text-on-surface dark:text-inverse-on-surface hover:bg-surface-container-high flex items-center gap-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">forum</span>
+                          <span>Rebook Previous Doctor</span>
+                        </button>
+                        <span className="px-2.5 py-1 rounded-full font-label-sm text-[11px] font-semibold bg-primary/10 text-primary dark:text-primary-fixed-dim">
+                          Random Doctor Match
+                        </span>
+                      </div>
                     </div>
 
                     {bookingMessage && (
@@ -1641,7 +1713,7 @@ export default function UserDashboard() {
                                 onClick={() => setSelectedCalendarDate(day.dateStr)}
                                 className={`py-2 px-3 rounded-xl flex flex-col items-center justify-center min-w-[76px] transition-all cursor-pointer border shrink-0 ${
                                   isSelected
-                                    ? 'border-primary dark:border-primary-fixed-dim bg-primary dark:bg-primary-fixed-dim text-on-primary dark:text-on-primary-fixed shadow-sm'
+                                    ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-bold shadow-sm ring-1 ring-primary/40'
                                     : 'border-outline-variant/60 bg-surface-container-low dark:bg-surface-container hover:bg-surface-container-high'
                                 }`}
                               >
@@ -1713,15 +1785,27 @@ export default function UserDashboard() {
                                   !s.isAvailable
                                     ? 'border-outline-variant/30 bg-surface-container-high/40 dark:bg-surface-container/30 opacity-50 cursor-not-allowed'
                                     : isSelected
-                                    ? 'border-primary dark:border-primary-fixed-dim bg-primary/10 dark:bg-primary-container/40 ring-1 ring-primary'
+                                    ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white ring-1 ring-primary'
                                     : 'border-outline-variant/60 bg-surface-container-low dark:bg-surface-container hover:border-primary/50'
                                 }`}
                               >
                                 <div>
-                                  <span className="font-label-lg text-xs font-bold text-on-surface dark:text-inverse-on-surface block">
+                                  <span
+                                    className={`font-label-lg text-xs font-bold block ${
+                                      isSelected
+                                        ? 'text-stone-900 dark:text-white'
+                                        : 'text-on-surface dark:text-inverse-on-surface'
+                                    }`}
+                                  >
                                     {s.label}
                                   </span>
-                                  <span className="font-body-sm text-[11px] text-on-surface-variant dark:text-tertiary-fixed-dim block mt-0.5">
+                                  <span
+                                    className={`font-body-sm text-[11px] block mt-0.5 ${
+                                      isSelected
+                                        ? 'text-stone-700 dark:text-stone-200'
+                                        : 'text-on-surface-variant dark:text-tertiary-fixed-dim'
+                                    }`}
+                                  >
                                     25 minutes duration
                                   </span>
                                 </div>
@@ -1781,7 +1865,7 @@ export default function UserDashboard() {
                         <button
                           type="submit"
                           disabled={bookingSubmitting}
-                          className="w-full py-2.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-sm text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+                          className="w-full py-2.5 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
                         >
                           {bookingSubmitting ? (
                             <>
@@ -1815,9 +1899,19 @@ export default function UserDashboard() {
                           My Counseling Sessions
                         </h3>
                       </div>
-                      <span className="font-label-sm text-xs text-on-surface-variant dark:text-tertiary-fixed-dim">
-                        {myAppointments.length} total
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={loadAppointments}
+                          className="p-1 rounded-md hover:bg-surface-container-high text-on-surface-variant dark:text-tertiary-fixed-dim cursor-pointer transition-colors"
+                          title="Refresh session & Google Meet status"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">refresh</span>
+                        </button>
+                        <span className="font-label-sm text-xs text-on-surface-variant dark:text-tertiary-fixed-dim">
+                          {myAppointments.length} total
+                        </span>
+                      </div>
                     </div>
 
                     {loadingAppointments ? (
@@ -1874,17 +1968,43 @@ export default function UserDashboard() {
                             </div>
 
                             {['SCHEDULED', 'RESCHEDULED'].includes(appt.status) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRescheduleModalAppt(appt);
-                                  setRescheduleDate(appt.date);
-                                }}
-                                className="mt-1 py-1 px-2.5 rounded-lg bg-surface-container-high dark:bg-surface-container-highest text-primary dark:text-primary-fixed-dim font-label-sm text-[11px] font-semibold hover:bg-surface-container-lowest flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[13px]">edit_calendar</span>
-                                <span>Reschedule Time</span>
-                              </button>
+                              <div className="flex flex-col gap-1.5 mt-1">
+                                {appt.meetingStatus === 'LIVE' && appt.meetingLink ? (
+                                  <a
+                                    href={appt.meetingLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-sm text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                                  >
+                                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                    <span className="material-symbols-outlined text-[15px]">video_call</span>
+                                    <span>Join Google Meet ({appt.meetingCode || 'Live'})</span>
+                                    <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                                  </a>
+                                ) : appt.meetingStatus === 'ENDED' ? (
+                                  <div className="py-1 px-2 rounded-lg bg-surface-container-high dark:bg-surface-container-highest text-on-surface-variant font-label-sm text-[10px] flex items-center justify-center gap-1">
+                                    <span className="material-symbols-outlined text-[13px]">call_end</span>
+                                    <span>Google Meet Session Ended</span>
+                                  </div>
+                                ) : (
+                                  <div className="py-1 px-2 rounded-lg bg-surface-container-high dark:bg-surface-container-highest text-on-surface-variant dark:text-tertiary-fixed-dim font-label-sm text-[10px] flex items-center justify-center gap-1">
+                                    <span className="material-symbols-outlined text-[13px]">hourglass_top</span>
+                                    <span>Waiting for Doctor (Admin) to Start Meet</span>
+                                  </div>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRescheduleModalAppt(appt);
+                                    setRescheduleDate(appt.date);
+                                  }}
+                                  className="py-1 px-2.5 rounded-lg bg-surface-container-high dark:bg-surface-container-highest text-primary dark:text-primary-fixed-dim font-label-sm text-[11px] font-semibold hover:bg-surface-container-lowest flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">edit_calendar</span>
+                                  <span>Reschedule Time</span>
+                                </button>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -1995,7 +2115,7 @@ export default function UserDashboard() {
                       onClick={() => setRescheduleDate(d.dateStr)}
                       className={`py-1.5 px-3 rounded-lg text-xs font-semibold shrink-0 cursor-pointer border ${
                         rescheduleDate === d.dateStr
-                          ? 'border-primary bg-primary text-on-primary'
+                          ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-bold ring-1 ring-primary/40'
                           : 'border-outline-variant bg-surface-container-low hover:bg-surface-container-high'
                       }`}
                     >
@@ -2022,7 +2142,7 @@ export default function UserDashboard() {
               <div className="relative">
                 {loadingRescheduleSlots && (
                   <div className="absolute inset-0 bg-surface/40 dark:bg-tertiary/40 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl transition-all">
-                    <div className="px-3 py-1 rounded-full bg-surface-container-highest text-primary text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+                    <div className="px-3 py-1 rounded-full bg-surface-container-highest dark:bg-surface-container text-primary dark:text-primary-fixed-dim text-xs font-semibold flex items-center gap-1.5 shadow-sm">
                       <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
                       <span>Checking clinician slots...</span>
                     </div>
@@ -2039,7 +2159,7 @@ export default function UserDashboard() {
                         !s.isAvailable
                           ? 'opacity-40 border-outline-variant/30 cursor-not-allowed bg-surface-container-high'
                           : rescheduleSelectedSlot === s.slot
-                          ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                          ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white ring-1 ring-primary font-bold'
                           : 'border-outline-variant bg-surface-container-low hover:border-primary/50'
                       }`}
                     >
@@ -2065,7 +2185,7 @@ export default function UserDashboard() {
                 type="button"
                 disabled={!rescheduleSelectedSlot || rescheduleSubmitting}
                 onClick={handleRescheduleSubmit}
-                className="px-space-lg py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary-container disabled:opacity-50 cursor-pointer"
+                className="px-space-lg py-2 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
               >
                 {rescheduleSubmitting ? 'Rescheduling...' : 'Confirm Reschedule'}
               </button>
@@ -2160,7 +2280,7 @@ export default function UserDashboard() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting || !user?.orgId}
-                className="px-space-lg py-2.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+                className="px-space-lg py-2.5 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
               >
                 {submitting ? (
                   <>

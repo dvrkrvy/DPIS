@@ -187,10 +187,10 @@ export default function RegisterPage() {
               <button
                 key={tab.id}
                 aria-selected={isSelected}
-                className={`py-2 px-2 rounded-lg font-label-lg text-label-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                className={`py-2 px-2 rounded-lg font-label-lg text-label-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
                   isSelected
-                    ? 'bg-primary text-on-primary shadow-sm'
-                    : 'text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface dark:hover:text-inverse-on-surface'
+                    ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-semibold shadow-sm'
+                    : 'border-transparent text-on-surface-variant dark:text-tertiary-fixed-dim hover:text-on-surface dark:hover:text-inverse-on-surface'
                 }`}
                 onClick={() => handleTabChange(tab.id)}
                 role="tab"
@@ -370,7 +370,7 @@ export default function RegisterPage() {
           )}
 
           <button
-            className="w-full mt-space-sm py-3.5 px-6 rounded-lg bg-primary text-on-primary hover:bg-primary-container disabled:opacity-60 transition-colors font-label-lg text-label-lg cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+            className="w-full mt-space-sm py-3.5 px-6 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white disabled:opacity-60 transition-colors font-label-lg text-label-lg cursor-pointer flex items-center justify-center gap-2 shadow-sm"
             disabled={loading}
             type="submit"
           >

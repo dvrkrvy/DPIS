@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 
 const SEVERITY_COLORS = {
   LOW: '#8fa986',
@@ -8,6 +9,7 @@ const SEVERITY_COLORS = {
 };
 
 export default function ComorbidityScatterPlot({ profiles = [] }) {
+  const { isDark } = useTheme();
   const [hoveredNode, setHoveredNode] = useState(null);
 
   // SVG dimensions
@@ -203,7 +205,7 @@ export default function ComorbidityScatterPlot({ profiles = [] }) {
                   cy={cy}
                   r={isHovered ? 7 : 5}
                   fill={color}
-                  stroke="#121318"
+                  stroke={isDark ? '#121318' : '#ffffff'}
                   strokeWidth="1.5"
                   className="transition-all duration-200"
                 />

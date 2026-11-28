@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { doctorApi, appointmentApi } from '../services/api';
+import { doctorApi, appointmentApi, googleApi } from '../services/api';
+import { COUNSELING_SLOTS } from '../constants/counseling';
 
 const STATUS_OPTIONS = ['UNREVIEWED', 'CONTACTED', 'IN_CARE', 'RESOLVED'];
 
@@ -24,15 +25,6 @@ const APPT_STATUS_BADGE = {
   COMPLETED: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30',
   CANCELLED: 'bg-neutral-500/15 text-neutral-600 dark:text-neutral-400 border border-neutral-500/30',
 };
-
-const COUNSELING_SLOTS = [
-  { id: 'slot-1', slot: '17:00-17:25', start: '17:00', end: '17:25', label: '05:00 PM – 05:25 PM' },
-  { id: 'slot-2', slot: '17:30-17:55', start: '17:30', end: '17:55', label: '05:30 PM – 05:55 PM' },
-  { id: 'slot-3', slot: '18:00-18:25', start: '18:00', end: '18:25', label: '06:00 PM – 06:25 PM' },
-  { id: 'slot-4', slot: '18:30-18:55', start: '18:30', end: '18:55', label: '06:30 PM – 06:55 PM' },
-  { id: 'slot-5', slot: '19:00-19:25', start: '19:00', end: '19:25', label: '07:00 PM – 07:25 PM' },
-  { id: 'slot-6', slot: '19:30-19:55', start: '19:30', end: '19:55', label: '07:30 PM – 07:55 PM' },
-];
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
@@ -69,6 +61,15 @@ export default function DoctorDashboard() {
   });
   const [apptStatusFilter, setApptStatusFilter] = useState('ALL');
   const [updatingApptId, setUpdatingApptId] = useState('');
+
+  // Google Meet Host & OAuth State
+  const [googleStatus, setGoogleStatus] = useState({ configured: false, connected: false, googleEmail: null });
+  const [meetBusyId, setMeetBusyId] = useState('');
+  const [meetBanner, setMeetBanner] = useState(null); // { type: 'success' | 'error', text: string, link?: string }
+  const [hostMeetModalAppt, setHostMeetModalAppt] = useState(null);
+  const [hostMeetUrlInput, setHostMeetUrlInput] = useState('');
+  const [hostMeetModalError, setHostMeetModalError] = useState('');
+  const [copiedApptId, setCopiedApptId] = useState('');
 
   // Doctor Direct Booking Modal State
   const [bookingModalPatient, setBookingModalPatient] = useState(null); // { anonymousId, patient, isCritical, orgName }
@@ -179,8 +180,40 @@ export default function DoctorDashboard() {
     }
   };
 
+  const loadGoogleStatus = async () => {
+    try {
+      const res = await googleApi.getStatus();
+      setGoogleStatus({
+        configured: Boolean(res?.configured),
+        connected: Boolean(res?.connected),
+        googleEmail: res?.googleEmail || null,
+      });
+    } catch {
+      // Ignore transient status fetch failure
+    }
+  };
+
   useEffect(() => {
     loadDoctorAppointments();
+    loadGoogleStatus();
+
+    const params = new URLSearchParams(window.location.search);
+    const gStatus = params.get('google');
+    if (gStatus) {
+      setViewMode('calendar');
+      if (gStatus === 'connected') {
+        setMeetBanner({
+          type: 'success',
+          text: 'Google account linked! Clicking "Start Google Meet (Admin)" now generates a Meet room automatically with you as Host.',
+        });
+      } else if (gStatus === 'error') {
+        setMeetBanner({
+          type: 'error',
+          text: `Google connection error: ${params.get('reason') || 'Authorization cancelled'}`,
+        });
+      }
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
   // When booking modal opens or booking date changes, fetch doctor's availability
@@ -304,6 +337,109 @@ export default function DoctorDashboard() {
     } finally {
       setUpdatingApptId('');
     }
+  };
+
+  const handleConnectGoogle = async () => {
+    try {
+      const res = await googleApi.getAuthUrl(window.location.origin);
+      if (res?.url) {
+        window.location.href = res.url;
+      }
+    } catch (err) {
+      setMeetBanner({ type: 'error', text: err.message || 'Failed to initiate Google OAuth' });
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      await googleApi.disconnect();
+      setGoogleStatus((prev) => ({ ...prev, connected: false, googleEmail: null }));
+      setMeetBanner({ type: 'success', text: 'Google account disconnected.' });
+    } catch (err) {
+      setMeetBanner({ type: 'error', text: err.message || 'Failed to disconnect Google account' });
+    }
+  };
+
+  const handleStartOrJoinMeet = async (appt) => {
+    if (!appt?._id) return;
+
+    // If meeting already exists & is live, open directly in sync so popup blockers never block it
+    if (appt.meetingStatus === 'LIVE' && appt.meetingLink) {
+      window.open(appt.hostJoinLink || appt.meetingLink, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setMeetBusyId(appt._id);
+    setMeetBanner(null);
+    try {
+      const res = await appointmentApi.startMeeting(appt._id);
+      await loadDoctorAppointments();
+      const joinUrl = res?.hostJoinLink || res?.appointment?.meetingLink;
+      if (joinUrl) {
+        const win = window.open(joinUrl, '_blank', 'noopener,noreferrer');
+        setMeetBanner({
+          type: 'success',
+          text: win
+            ? 'Google Meet is LIVE! You are joining as Admin/Host, and the student can now join the same link.'
+            : 'Google Meet is LIVE! Click the button below to enter as Admin/Host (popup was blocked).',
+          link: joinUrl,
+        });
+      }
+    } catch (err) {
+      if (err?.data?.code === 'GOOGLE_NOT_CONNECTED') {
+        setHostMeetModalAppt(appt);
+        setHostMeetUrlInput(appt.meetingLink || '');
+        setHostMeetModalError('');
+      } else {
+        setMeetBanner({ type: 'error', text: err.message || 'Failed to start Google Meet session' });
+      }
+    } finally {
+      setMeetBusyId('');
+    }
+  };
+
+  const handleSubmitHostMeetLink = async (e) => {
+    e.preventDefault();
+    if (!hostMeetModalAppt?._id) return;
+    setMeetBusyId(hostMeetModalAppt._id);
+    setHostMeetModalError('');
+    try {
+      const res = await appointmentApi.startMeeting(hostMeetModalAppt._id, {
+        meetingLink: hostMeetUrlInput,
+      });
+      await loadDoctorAppointments();
+      const sharedUrl = res?.hostJoinLink || res?.appointment?.meetingLink;
+      setHostMeetModalAppt(null);
+      setHostMeetUrlInput('');
+      setMeetBanner({
+        type: 'success',
+        text: 'Google Meet room saved & LIVE! The student can now join your exact same session link.',
+        link: sharedUrl,
+      });
+    } catch (err) {
+      setHostMeetModalError(err.message || 'Invalid Google Meet link');
+    } finally {
+      setMeetBusyId('');
+    }
+  };
+
+  const handleEndMeet = async (apptId) => {
+    setMeetBusyId(apptId);
+    try {
+      await appointmentApi.endMeeting(apptId);
+      await loadDoctorAppointments();
+    } catch (err) {
+      setMeetBanner({ type: 'error', text: err.message || 'Failed to end meeting' });
+    } finally {
+      setMeetBusyId('');
+    }
+  };
+
+  const handleCopyMeetLink = (appt) => {
+    if (!appt?.meetingLink) return;
+    navigator.clipboard?.writeText(appt.meetingLink);
+    setCopiedApptId(appt._id);
+    setTimeout(() => setCopiedApptId(''), 1800);
   };
 
   // Group queue items by Patient (anonymousId)
@@ -494,7 +630,7 @@ export default function DoctorDashboard() {
             onClick={() => setSelectedOrgId('ALL')}
             className={`px-4 py-2.5 rounded-xl font-label-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
               selectedOrgId === 'ALL'
-                ? 'bg-primary dark:bg-primary-fixed-dim text-on-primary dark:text-on-primary-fixed shadow-sm'
+                ? 'border border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-bold shadow-sm ring-1 ring-primary/40'
                 : 'bg-surface-container-low dark:bg-tertiary border border-outline-variant/60 text-on-surface dark:text-inverse-on-surface hover:bg-surface-container-high'
             }`}
           >
@@ -512,7 +648,7 @@ export default function DoctorDashboard() {
                 onClick={() => setSelectedOrgId(org._id)}
                 className={`px-4 py-2.5 rounded-xl font-label-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-primary dark:bg-primary-fixed-dim text-on-primary dark:text-on-primary-fixed shadow-sm'
+                    ? 'border border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-bold shadow-sm ring-1 ring-primary/40'
                     : 'bg-surface-container-low dark:bg-tertiary border border-outline-variant/60 text-on-surface dark:text-inverse-on-surface hover:bg-surface-container-high'
                 }`}
               >
@@ -594,7 +730,7 @@ export default function DoctorDashboard() {
               onClick={() => setViewMode('profiles')}
               className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'profiles'
-                  ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                  ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
@@ -607,7 +743,7 @@ export default function DoctorDashboard() {
               onClick={() => setViewMode('queue')}
               className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'queue'
-                  ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                  ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
@@ -620,7 +756,7 @@ export default function DoctorDashboard() {
               onClick={() => setViewMode('calendar')}
               className={`px-3 py-1.5 rounded-md font-label-sm text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'calendar'
-                  ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-sm'
+                  ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white font-bold shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
@@ -939,7 +1075,7 @@ export default function DoctorDashboard() {
 
                     <div className="md:col-span-2">
                       <button
-                        className="w-full py-2 px-3 rounded-lg bg-primary text-on-primary hover:bg-primary-container disabled:opacity-60 font-label-sm text-xs font-semibold transition-colors cursor-pointer shadow-sm"
+                        className="w-full py-2 px-3 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white disabled:opacity-60 font-label-sm text-xs font-semibold transition-colors cursor-pointer shadow-sm"
                         disabled={savingId === item._id}
                         onClick={() => handleSaveCase(item._id)}
                         type="button"
@@ -1041,8 +1177,45 @@ export default function DoctorDashboard() {
                 </p>
               </div>
 
-              {/* Date Input */}
-              <div className="flex items-center gap-2">
+              {/* Date Input & Google Host Bar */}
+              <div className="flex flex-wrap items-center gap-2">
+                {googleStatus.connected ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">
+                      video_call
+                    </span>
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-300 truncate max-w-[180px]">
+                      Host Google: {googleStatus.googleEmail || 'Connected'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleDisconnectGoogle}
+                      className="text-[11px] underline text-on-surface-variant hover:text-rose-600 cursor-pointer ml-1"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ) : googleStatus.configured ? (
+                  <button
+                    type="button"
+                    onClick={handleConnectGoogle}
+                    className="px-3 py-1.5 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">video_call</span>
+                    <span>Connect Google for Auto Meet</span>
+                  </button>
+                ) : (
+                  <span
+                    className="px-2.5 py-1.5 rounded-lg bg-surface-container-high dark:bg-surface-container border border-outline-variant/60 text-xs font-medium text-on-surface-variant dark:text-tertiary-fixed-dim flex items-center gap-1.5"
+                    title="Launch Google Meet as Host and attach room link (or add GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET in .env for 1-click auto creation)"
+                  >
+                    <span className="material-symbols-outlined text-[15px] text-primary dark:text-primary-fixed-dim">
+                      video_camera_front
+                    </span>
+                    <span>Host Meet Ready</span>
+                  </span>
+                )}
+
                 <span className="font-label-sm text-xs text-on-surface-variant font-medium">Selected Date:</span>
                 <input
                   type="date"
@@ -1052,6 +1225,43 @@ export default function DoctorDashboard() {
                 />
               </div>
             </div>
+
+            {meetBanner && (
+              <div
+                className={`p-3 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-2 ${
+                  meetBanner.type === 'error'
+                    ? 'bg-error-container text-on-error-container border-error/30'
+                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px]">
+                    {meetBanner.type === 'error' ? 'error' : 'video_call'}
+                  </span>
+                  <span className="font-medium">{meetBanner.text}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {meetBanner.link && (
+                    <a
+                      href={meetBanner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] text-white font-semibold flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                      <span>Open Google Meet (Admin)</span>
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMeetBanner(null)}
+                    className="text-[11px] opacity-75 hover:opacity-100 cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Quick 21-Day Date Strip with Smooth Scroll Controls */}
             <div className="flex items-center gap-1.5 w-full">
@@ -1078,7 +1288,7 @@ export default function DoctorDashboard() {
                     onClick={() => setSelectedCalendarDate(d.dateStr)}
                     className={`py-2 px-3 rounded-xl flex flex-col items-center min-w-[76px] transition-all cursor-pointer border shrink-0 ${
                       selectedCalendarDate === d.dateStr
-                        ? 'border-primary bg-primary text-on-primary shadow-sm'
+                        ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-bold shadow-sm ring-1 ring-primary/40'
                         : 'border-outline-variant/60 bg-surface-container-low dark:bg-surface-container text-on-surface dark:text-inverse-on-surface hover:bg-surface-container-high'
                     }`}
                   >
@@ -1219,6 +1429,35 @@ export default function DoctorDashboard() {
                               &ldquo;{appt.notes}&rdquo;
                             </p>
                           )}
+
+                          {/* Google Meet Status Chip */}
+                          {appt.meetingLink && (
+                            <div className="p-2 rounded-lg bg-surface-container-low dark:bg-surface-container border border-outline-variant/50 flex items-center justify-between gap-2 text-[11px]">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span
+                                  className={`w-2 h-2 rounded-full shrink-0 ${
+                                    appt.meetingStatus === 'LIVE'
+                                      ? 'bg-emerald-500 animate-pulse'
+                                      : 'bg-neutral-400'
+                                  }`}
+                                />
+                                <span className="font-mono font-semibold truncate text-on-surface dark:text-inverse-on-surface">
+                                  {appt.meetingCode || 'Google Meet Ready'}
+                                </span>
+                                <span className="text-[10px] uppercase font-bold text-on-surface-variant">
+                                  ({appt.meetingStatus === 'LIVE' ? 'LIVE' : appt.meetingStatus === 'ENDED' ? 'ENDED' : 'READY'})
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyMeetLink(appt)}
+                                className="px-1.5 py-0.5 rounded bg-surface-container-high dark:bg-surface-container-highest text-[10px] font-semibold text-primary dark:text-primary-fixed-dim cursor-pointer shrink-0"
+                                title="Copy shared Google Meet link"
+                              >
+                                {copiedApptId === appt._id ? 'Copied!' : 'Copy'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="py-4 text-center flex flex-col items-center justify-center gap-1 text-on-surface-variant">
@@ -1236,39 +1475,85 @@ export default function DoctorDashboard() {
                     {/* Slot Actions */}
                     <div className="pt-2 border-t border-outline-variant/30">
                       {isBooked ? (
-                        <div className="flex items-center gap-1.5">
-                          {appt.status !== 'COMPLETED' && (
-                            <button
-                              type="button"
-                              disabled={updatingApptId === appt._id}
-                              onClick={() => handleUpdateApptStatus(appt._id, 'COMPLETED')}
-                              className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-sm text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                              <span>Complete</span>
-                            </button>
-                          )}
-
+                        <div className="flex flex-col gap-1.5">
+                          {/* Host Meet Controls */}
                           {appt.status !== 'CANCELLED' && (
-                            <button
-                              type="button"
-                              disabled={updatingApptId === appt._id}
-                              onClick={() => handleUpdateApptStatus(appt._id, 'CANCELLED')}
-                              className="py-1.5 px-2 rounded-lg border border-outline-variant hover:bg-surface-container-high text-on-surface-variant font-label-sm text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">cancel</span>
-                              <span>Cancel</span>
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              {appt.meetingStatus === 'LIVE' && appt.meetingLink ? (
+                                <>
+                                  <a
+                                    href={appt.hostJoinLink || appt.meetingLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 py-1.5 px-2.5 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors shadow-xs"
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">video_call</span>
+                                    <span>Join Meet (Admin)</span>
+                                  </a>
+                                  <button
+                                    type="button"
+                                    disabled={meetBusyId === appt._id}
+                                    onClick={() => handleEndMeet(appt._id)}
+                                    className="py-1.5 px-2 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-label-sm text-[11px] font-semibold cursor-pointer disabled:opacity-50"
+                                    title="End live Google Meet session"
+                                  >
+                                    End Meet
+                                  </button>
+                                </>
+                              ) : appt.status !== 'COMPLETED' ? (
+                                <button
+                                  type="button"
+                                  disabled={meetBusyId === appt._id}
+                                  onClick={() => handleStartOrJoinMeet(appt)}
+                                  className="w-full py-1.5 px-2.5 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">video_call</span>
+                                  <span>
+                                    {meetBusyId === appt._id
+                                      ? 'Creating Meet...'
+                                      : appt.meetingLink
+                                      ? 'Restart Google Meet (Admin)'
+                                      : 'Start Google Meet (Admin)'}
+                                  </span>
+                                </button>
+                              ) : null}
+                            </div>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() => loadPatientHistory(appt.anonymousId)}
-                            className="py-1.5 px-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-primary font-label-sm text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                            title="Inspect Patient History"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">history</span>
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            {appt.status !== 'COMPLETED' && (
+                              <button
+                                type="button"
+                                disabled={updatingApptId === appt._id}
+                                onClick={() => handleUpdateApptStatus(appt._id, 'COMPLETED')}
+                                className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-label-sm text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                                <span>Complete</span>
+                              </button>
+                            )}
+
+                            {appt.status !== 'CANCELLED' && (
+                              <button
+                                type="button"
+                                disabled={updatingApptId === appt._id}
+                                onClick={() => handleUpdateApptStatus(appt._id, 'CANCELLED')}
+                                className="py-1.5 px-2 rounded-lg border border-outline-variant hover:bg-surface-container-high text-on-surface-variant font-label-sm text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">cancel</span>
+                                <span>Cancel</span>
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => loadPatientHistory(appt.anonymousId)}
+                              className="py-1.5 px-2 rounded-lg bg-surface-container-high dark:bg-surface-container hover:bg-surface-container-highest text-primary dark:text-primary-fixed-dim font-label-sm text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                              title="Inspect Patient History"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">history</span>
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <button
@@ -1318,7 +1603,7 @@ export default function DoctorDashboard() {
                     onClick={() => setApptStatusFilter(st)}
                     className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                       apptStatusFilter === st
-                        ? 'bg-surface-container-lowest dark:bg-tertiary text-primary dark:text-primary-fixed-dim shadow-xs font-bold'
+                        ? 'bg-surface-container-lowest dark:bg-tertiary text-stone-900 dark:text-white shadow-xs font-bold'
                         : 'text-on-surface-variant hover:text-on-surface'
                     }`}
                   >
@@ -1412,6 +1697,29 @@ export default function DoctorDashboard() {
 
                           <td className="py-2.5 px-3 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
+                              {a.status !== 'CANCELLED' && a.status !== 'COMPLETED' && (
+                                a.meetingStatus === 'LIVE' && a.meetingLink ? (
+                                  <a
+                                    href={a.hostJoinLink || a.meetingLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2 py-1 rounded bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] text-white text-[11px] font-semibold inline-flex items-center gap-1"
+                                  >
+                                    <span className="material-symbols-outlined text-[13px]">video_call</span>
+                                    <span>Join Admin</span>
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={meetBusyId === a._id}
+                                    onClick={() => handleStartOrJoinMeet(a)}
+                                    className="px-2 py-1 rounded bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] text-white text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <span className="material-symbols-outlined text-[13px]">video_call</span>
+                                    <span>Start Meet</span>
+                                  </button>
+                                )
+                              )}
                               {a.status !== 'COMPLETED' && (
                                 <button
                                   type="button"
@@ -1433,7 +1741,7 @@ export default function DoctorDashboard() {
                               <button
                                 type="button"
                                 onClick={() => loadPatientHistory(a.anonymousId)}
-                                className="px-2 py-1 rounded bg-surface-container-high text-primary hover:bg-surface-container-highest text-[11px] cursor-pointer"
+                                className="px-2 py-1 rounded bg-surface-container-high dark:bg-surface-container text-primary dark:text-primary-fixed-dim hover:bg-surface-container-highest text-[11px] cursor-pointer"
                                 title="Patient History"
                               >
                                 History
@@ -1568,7 +1876,7 @@ export default function DoctorDashboard() {
                         }}
                         className={`py-1.5 px-3 rounded-lg text-xs font-semibold shrink-0 cursor-pointer border ${
                           bookingDate === d.dateStr
-                            ? 'border-primary bg-primary text-on-primary'
+                            ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white font-bold ring-1 ring-primary/40'
                             : 'border-outline-variant bg-surface-container-low dark:bg-surface-container hover:bg-surface-container-high'
                         }`}
                       >
@@ -1605,7 +1913,7 @@ export default function DoctorDashboard() {
                 <div className="relative">
                   {loadingBookingAvailability && (
                     <div className="absolute inset-0 bg-surface/40 dark:bg-tertiary/40 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl transition-all">
-                      <div className="px-3 py-1.5 rounded-full bg-surface-container-highest dark:bg-surface-container text-primary text-xs font-semibold flex items-center gap-1.5 shadow-md">
+                      <div className="px-3 py-1.5 rounded-full bg-surface-container-highest dark:bg-surface-container text-primary dark:text-primary-fixed-dim text-xs font-semibold flex items-center gap-1.5 shadow-md">
                         <span className="material-symbols-outlined text-[15px] animate-spin">progress_activity</span>
                         <span>Verifying your schedule...</span>
                       </div>
@@ -1628,7 +1936,7 @@ export default function DoctorDashboard() {
                             !isAvailable
                               ? 'opacity-40 border-outline-variant bg-surface-container-high cursor-not-allowed'
                               : isSelected
-                              ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
+                              ? 'border-primary dark:border-primary-fixed-dim bg-primary-fixed dark:bg-primary-container text-stone-900 dark:text-white ring-1 ring-primary font-bold'
                               : 'border-outline-variant hover:border-primary/50 bg-surface-container-low dark:bg-surface-container'
                           }`}
                         >
@@ -1686,7 +1994,7 @@ export default function DoctorDashboard() {
                 <button
                   type="submit"
                   disabled={bookingSubmitting || !bookingSlot}
-                  className="px-4 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-xs font-semibold hover:bg-primary-container disabled:opacity-50 transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold disabled:opacity-50 transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
                 >
                   {bookingSubmitting ? (
                     <>
@@ -1749,7 +2057,7 @@ export default function DoctorDashboard() {
                       isCritical: Boolean(patientHistoryData?.patient),
                     });
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-xs font-semibold hover:bg-primary-container flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="px-3 py-1.5 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   <span className="material-symbols-outlined text-[16px]">calendar_month</span>
                   <span>Schedule Counseling</span>
@@ -1871,7 +2179,7 @@ export default function DoctorDashboard() {
                           type="button"
                           disabled={savingId === hItem._id}
                           onClick={() => handleSaveCase(hItem._id)}
-                          className="sm:col-span-2 py-1.5 px-2 rounded-lg bg-primary text-on-primary font-label-sm text-xs font-semibold hover:bg-primary-container disabled:opacity-50 cursor-pointer"
+                          className="sm:col-span-2 py-1.5 px-2 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold disabled:opacity-50 cursor-pointer"
                         >
                           {savingId === hItem._id ? 'Saving' : 'Save'}
                         </button>
@@ -1895,6 +2203,113 @@ export default function DoctorDashboard() {
                 Close Profile
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* HOST GOOGLE MEET LAUNCH & SHARE MODAL                                     */}
+      {/* ========================================================================= */}
+      {hostMeetModalAppt && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-surface-container-lowest dark:bg-tertiary border border-outline-variant rounded-2xl p-space-xl shadow-2xl flex flex-col gap-space-md">
+            <div className="flex items-center justify-between pb-space-xs border-b border-outline-variant/40">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-[24px]">
+                  video_call
+                </span>
+                <h3 className="font-headline-sm text-title-md font-bold text-on-surface dark:text-inverse-on-surface">
+                  Start Google Meet as Admin / Host
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHostMeetModalAppt(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-container-low dark:bg-surface-container border border-outline-variant/50 text-xs flex items-center justify-between">
+              <span>
+                Session: <strong className="text-on-surface dark:text-inverse-on-surface">{hostMeetModalAppt.date} · {hostMeetModalAppt.slot}</strong>
+              </span>
+              <span className="font-mono font-bold text-primary dark:text-primary-fixed-dim">
+                {hostMeetModalAppt.anonymousId}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="font-label-sm text-xs font-bold text-on-surface dark:text-inverse-on-surface">
+                Step 1: Launch a Google Meet Room (Makes You Host/Admin)
+              </span>
+              <a
+                href="https://meet.google.com/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 rounded-xl bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">add_call</span>
+                <span>Open New Google Meet Session as Host</span>
+                <span className="material-symbols-outlined text-[15px]">open_in_new</span>
+              </a>
+              <p className="font-body-sm text-[11px] text-on-surface-variant dark:text-tertiary-fixed-dim">
+                Google opens your new Meet room immediately with full Host/Admin controls. Copy the Meet URL or code from that tab and paste it below so the student joins the exact same link.
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmitHostMeetLink} className="flex flex-col gap-space-sm pt-2 border-t border-outline-variant/40">
+              <label className="font-label-sm text-xs font-bold text-on-surface dark:text-inverse-on-surface">
+                Step 2: Paste Google Meet Link or Code
+              </label>
+              <input
+                type="text"
+                required
+                value={hostMeetUrlInput}
+                onChange={(e) => setHostMeetUrlInput(e.target.value)}
+                placeholder="https://meet.google.com/xxx-yyyy-zzz or xxx-yyyy-zzz"
+                className="w-full px-3 py-2.5 rounded-lg border border-outline-variant bg-surface dark:bg-surface-container text-xs text-on-surface dark:text-inverse-on-surface font-mono focus:outline-none focus:border-primary"
+              />
+
+              {hostMeetModalError && (
+                <div className="p-2 rounded-lg bg-error-container text-on-error-container text-xs">
+                  {hostMeetModalError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                {googleStatus.configured && !googleStatus.connected ? (
+                  <button
+                    type="button"
+                    onClick={handleConnectGoogle}
+                    className="text-xs font-semibold text-primary dark:text-primary-fixed-dim underline cursor-pointer"
+                  >
+                    Or connect Google for 1-click auto-create
+                  </button>
+                ) : (
+                  <span />
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHostMeetModalAppt(null)}
+                    className="px-3.5 py-2 rounded-lg border border-outline-variant text-xs font-semibold hover:bg-surface-container-high cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={meetBusyId === hostMeetModalAppt._id}
+                    className="px-4 py-2 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white font-label-sm text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-sm"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">podcasts</span>
+                    <span>{meetBusyId === hostMeetModalAppt._id ? 'Starting...' : 'Save & Share Live Link'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -170,7 +170,7 @@ export default function SignInPage() {
             )}
 
             <button
-              className="w-full mt-space-xs py-3 px-4 rounded-lg bg-primary text-on-primary hover:bg-primary-container disabled:opacity-60 transition-colors font-label-lg text-label-lg shadow-sm flex items-center justify-center gap-space-sm"
+              className="w-full mt-space-xs py-3 px-4 rounded-lg bg-[#33452f] hover:bg-[#4a5d45] dark:bg-[#3f573a] dark:hover:bg-[#4e6b48] text-white disabled:opacity-60 transition-colors font-label-lg text-label-lg shadow-sm flex items-center justify-center gap-space-sm"
               disabled={loading}
               type="submit"
             >

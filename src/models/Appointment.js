@@ -61,6 +61,42 @@ const appointmentSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
+        meetingProvider: {
+            type: String,
+            enum: ['GOOGLE_MEET', 'NONE'],
+            default: 'NONE',
+        },
+        meetingLink: {
+            type: String,
+            default: '',
+        },
+        meetingCode: {
+            type: String,
+            default: '',
+        },
+        meetingStatus: {
+            type: String,
+            enum: ['NOT_STARTED', 'LIVE', 'ENDED'],
+            default: 'NOT_STARTED',
+        },
+        googleEventId: {
+            type: String,
+            default: '',
+            select: false,
+        },
+        meetingHostEmail: {
+            type: String,
+            default: '',
+            select: false,
+        },
+        meetingStartedAt: {
+            type: Date,
+            default: null,
+        },
+        meetingEndedAt: {
+            type: Date,
+            default: null,
+        },
         rescheduleHistory: [
             {
                 previousDate: String,

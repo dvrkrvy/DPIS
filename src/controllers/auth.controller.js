@@ -168,6 +168,7 @@ const login = async (req, res) => {
                 role: user.role,
                 orgId: user.orgId,
                 anonymousId: user.anonymousId,
+                avatarUrl: user.profile?.avatarUrl || '',
             },
         });
     } catch (err) {

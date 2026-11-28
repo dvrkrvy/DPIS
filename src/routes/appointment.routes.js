@@ -7,6 +7,8 @@ const {
     getMyAppointments,
     getDoctorAppointments,
     updateAppointmentStatus,
+    startAppointmentMeeting,
+    endAppointmentMeeting,
 } = require('../controllers/appointment.controller');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
@@ -24,5 +26,7 @@ router.patch('/:id/reschedule', rescheduleAppointment);
 router.get('/doctor', requireRole('DOCTOR'), getDoctorAppointments);
 router.post('/doctor-book', requireRole('DOCTOR'), doctorBookAppointment);
 router.patch('/:id/status', requireRole('DOCTOR'), updateAppointmentStatus);
+router.post('/:id/meet/start', requireRole('DOCTOR'), startAppointmentMeeting);
+router.post('/:id/meet/end', requireRole('DOCTOR'), endAppointmentMeeting);
 
 module.exports = router;
